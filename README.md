@@ -119,8 +119,10 @@ Output:
 Or let GitHub build it: [`.github/workflows/build.yml`](.github/workflows/build.yml)
 runs the tests on Linux and builds both installers on `windows-latest` for
 every push, pull request and `v*` tag. Download them from the run's
-**vyro-windows** artifact. For a `v*` tag such as `v0.1.0`, they are also
-attached to a GitHub release.
+**vyro-windows** artifact. Builds from `main` are also published as a GitHub
+release named after the version in `package.json` (for example `v0.1.0`). Bump
+the version to start a new release; otherwise the same release's installers
+are replaced.
 
 **Signing.** Unsigned installers work, but Windows SmartScreen shows an
 "unrecognized app" warning on first run. To sign, set `bundle.windows.certificateThumbprint`
