@@ -1,0 +1,27 @@
+{
+  "format": "vyro-theme",
+  "formatVersion": 1,
+  "id": "night-drive",
+  "name": "Night Drive",
+  "author": "Your name",
+  "description": "Deep indigo panels with a violet accent",
+  "version": "1.0.0",
+  "mode": "dark",
+  "colors": {
+    "background": "#0f0f1a",
+    "panel": "#17172a",
+    "elevated": "#20203a",
+    "textPrimary": "#f2f0ff",
+    "textSecondary": "#a3a0c2",
+    "accent": "#8b6cff"
+  },
+  "radius": 18,
+  "density": "comfortable",
+  "background": {
+    "source": "album",
+    "blur": 100,
+    "brightness": 0.55,
+    "intensity": 0.8
+  },
+  "css": ".vy-lyric.active { letter-spacing: 0.01em; }"
+}

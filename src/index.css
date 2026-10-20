@@ -1,0 +1,428 @@
+@import "tailwindcss";
+@import "@fontsource-variable/manrope";
+
+@custom-variant dark (&:where([data-mode=dark], [data-mode=dark] *));
+
+/* Colours come from the active theme (src/lib/theme.ts writes --vy-* on :root). */
+@theme {
+  --font-sans: "Manrope Variable", "Segoe UI Variable", "Segoe UI", ui-sans-serif, system-ui, sans-serif;
+  --color-bg: var(--vy-bg);
+  --color-panel: var(--vy-panel);
+  --color-elevated: var(--vy-elevated);
+  --color-hover: var(--vy-hover);
+  --color-fg: var(--vy-text);
+  --color-fg-2: var(--vy-text-2);
+  --color-fg-3: var(--vy-text-3);
+  --color-line: var(--vy-border);
+  --color-accent: var(--vy-accent);
+  --color-on-accent: var(--vy-on-accent);
+  --radius-vy-sm: var(--vy-radius-sm);
+  --radius-vy: var(--vy-radius);
+  --radius-vy-lg: var(--vy-radius-lg);
+}
+
+/* Registered so colour changes interpolate smoothly (album → album crossfades). */
+@property --vy-accent {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #ff7a59;
+}
+@property --bg-c1 {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #241c2e;
+}
+@property --bg-c2 {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #1b2333;
+}
+@property --bg-c3 {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #1d2a26;
+}
+
+:root {
+  --vy-bg: #171717;
+  --vy-panel: #202020;
+  --vy-elevated: #292929;
+  --vy-hover: #303030;
+  --vy-text: #f5f5f5;
+  --vy-text-2: #a5a5a5;
+  --vy-text-3: #7a7a7a;
+  --vy-border: rgba(245, 245, 245, 0.08);
+  --vy-accent-base: #ff7a59;
+  --vy-accent: var(--vy-accent-base);
+  --vy-on-accent: #0b0b0b;
+  --vy-radius: 16px;
+  --vy-radius-sm: 9px;
+  --vy-radius-lg: 20px;
+  --vy-row: 56px;
+  --vy-density: 1;
+  --vy-shadow: 0 12px 40px rgba(0, 0, 0, 0.45);
+  --panel-alpha: 74%;
+  --bg-speed: 1;
+  --bg-transition: 1.8s;
+  transition:
+    --vy-accent 1.2s ease,
+    --bg-c1 var(--bg-transition) ease,
+    --bg-c2 var(--bg-transition) ease,
+    --bg-c3 var(--bg-transition) ease;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--vy-bg);
+  color: var(--vy-text);
+  font-family: var(--font-sans);
+  font-feature-settings: "ss01", "cv11";
+  -webkit-font-smoothing: antialiased;
+  overflow: hidden;
+  user-select: none;
+}
+
+input,
+textarea,
+[contenteditable] {
+  user-select: text;
+}
+
+::selection {
+  background: color-mix(in srgb, var(--vy-accent) 45%, transparent);
+}
+
+:focus-visible {
+  outline: 2px solid var(--vy-accent);
+  outline-offset: 2px;
+  border-radius: var(--vy-radius-sm);
+}
+
+/* ---------- glass panels ---------- */
+.vy-panel {
+  background: color-mix(in srgb, var(--vy-panel) var(--panel-alpha), transparent);
+  backdrop-filter: blur(28px) saturate(1.3);
+  -webkit-backdrop-filter: blur(28px) saturate(1.3);
+  border: 1px solid var(--vy-border);
+  border-radius: var(--vy-radius-lg);
+}
+.vy-elevated {
+  background: color-mix(in srgb, var(--vy-elevated) 82%, transparent);
+  border: 1px solid var(--vy-border);
+}
+html[data-perf="1"] .vy-panel {
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  --panel-alpha: 95%;
+}
+
+/* ---------- scrollbars ---------- */
+.vy-scroll {
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--vy-text) 18%, transparent) transparent;
+}
+.vy-scroll::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+.vy-scroll::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--vy-text) 16%, transparent);
+  border-radius: 99px;
+  border: 3px solid transparent;
+  background-clip: padding-box;
+}
+.vy-scroll::-webkit-scrollbar-thumb:hover {
+  background-color: color-mix(in srgb, var(--vy-text) 28%, transparent);
+}
+.vy-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* ---------- range sliders ---------- */
+.vy-range {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 16px;
+  background: transparent;
+  cursor: pointer;
+  --fill: 0%;
+}
+.vy-range::-webkit-slider-runnable-track {
+  height: 4px;
+  border-radius: 99px;
+  background: linear-gradient(
+    to right,
+    var(--range-color, var(--vy-text)) var(--fill),
+    color-mix(in srgb, var(--vy-text) 18%, transparent) var(--fill)
+  );
+}
+.vy-range::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 12px;
+  height: 12px;
+  margin-top: -4px;
+  border-radius: 50%;
+  background: var(--vy-text);
+  box-shadow: 0 1px 6px rgba(0, 0, 0, 0.4);
+  opacity: 0;
+  transition: opacity 0.15s ease, transform 0.15s ease;
+}
+.vy-range:hover,
+.vy-range:focus-visible {
+  --range-color: var(--vy-accent);
+}
+.vy-range:hover::-webkit-slider-thumb,
+.vy-range:focus-visible::-webkit-slider-thumb,
+.vy-range.always-thumb::-webkit-slider-thumb {
+  opacity: 1;
+}
+.vy-range:active::-webkit-slider-thumb {
+  transform: scale(1.2);
+}
+.vy-range::-moz-range-track {
+  height: 4px;
+  border-radius: 99px;
+  background: color-mix(in srgb, var(--vy-text) 18%, transparent);
+}
+.vy-range::-moz-range-progress {
+  height: 4px;
+  border-radius: 99px;
+  background: var(--range-color, var(--vy-text));
+}
+.vy-range::-moz-range-thumb {
+  width: 12px;
+  height: 12px;
+  border: 0;
+  border-radius: 50%;
+  background: var(--vy-text);
+}
+
+/* ---------- dynamic background ---------- */
+.vy-bg-layer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.vy-blob {
+  position: absolute;
+  border-radius: 50%;
+  will-change: transform;
+  animation-timing-function: ease-in-out;
+  animation-iteration-count: infinite;
+  animation-direction: alternate;
+}
+.vy-blob.b1 {
+  width: 70vmax;
+  height: 70vmax;
+  left: -18vmax;
+  top: -24vmax;
+  background: radial-gradient(circle at center, var(--bg-c1) 0%, transparent 65%);
+  animation-name: vy-drift-1;
+  animation-duration: calc(46s / var(--bg-speed));
+}
+.vy-blob.b2 {
+  width: 60vmax;
+  height: 60vmax;
+  right: -16vmax;
+  top: 8vmax;
+  background: radial-gradient(circle at center, var(--bg-c2) 0%, transparent 65%);
+  animation-name: vy-drift-2;
+  animation-duration: calc(58s / var(--bg-speed));
+}
+.vy-blob.b3 {
+  width: 64vmax;
+  height: 64vmax;
+  left: 18vmax;
+  bottom: -34vmax;
+  background: radial-gradient(circle at center, var(--bg-c3) 0%, transparent 65%);
+  animation-name: vy-drift-3;
+  animation-duration: calc(52s / var(--bg-speed));
+}
+@keyframes vy-drift-1 {
+  from {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  to {
+    transform: translate3d(14vmax, 9vmax, 0) scale(1.12);
+  }
+}
+@keyframes vy-drift-2 {
+  from {
+    transform: translate3d(0, 0, 0) scale(1.05);
+  }
+  to {
+    transform: translate3d(-16vmax, 12vmax, 0) scale(0.92);
+  }
+}
+@keyframes vy-drift-3 {
+  from {
+    transform: translate3d(0, 0, 0) scale(0.95);
+  }
+  to {
+    transform: translate3d(10vmax, -14vmax, 0) scale(1.1);
+  }
+}
+.vy-gradient-pan {
+  background-size: 200% 200%;
+  animation: vy-pan calc(36s / var(--bg-speed)) ease-in-out infinite alternate;
+}
+@keyframes vy-pan {
+  from {
+    background-position: 0% 30%;
+  }
+  to {
+    background-position: 100% 70%;
+  }
+}
+.vy-wave {
+  position: absolute;
+  inset: -40% -20%;
+  background: repeating-linear-gradient(
+    115deg,
+    transparent 0 14%,
+    color-mix(in srgb, var(--bg-c2) 60%, white 8%) 22%,
+    transparent 30% 44%
+  );
+  opacity: 0.16;
+  mix-blend-mode: screen;
+  filter: blur(40px);
+  animation: vy-wave calc(30s / var(--bg-speed)) linear infinite;
+  will-change: transform;
+}
+@keyframes vy-wave {
+  from {
+    transform: translate3d(-12%, 0, 0);
+  }
+  to {
+    transform: translate3d(12%, 0, 0);
+  }
+}
+.vy-art-bg {
+  position: absolute;
+  inset: -12%;
+  background-size: cover;
+  background-position: center;
+  transition: opacity var(--bg-transition) ease, transform 0.6s ease-out;
+  will-change: opacity, transform;
+}
+html[data-motion="reduce"] .vy-blob,
+html[data-motion="reduce"] .vy-wave,
+html[data-motion="reduce"] .vy-gradient-pan,
+html[data-motion="static"] .vy-blob,
+html[data-motion="static"] .vy-wave,
+html[data-motion="static"] .vy-gradient-pan {
+  animation: none !important;
+}
+html[data-motion="reduce"] *,
+html[data-motion="reduce"] *::before,
+html[data-motion="reduce"] *::after {
+  transition-duration: 0.01ms !important;
+  animation-duration: 0.01ms !important;
+  scroll-behavior: auto !important;
+}
+
+/* ---------- motion helpers ---------- */
+@keyframes vy-fade-up {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 8px, 0);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.vy-enter {
+  animation: vy-fade-up 0.35s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+}
+@keyframes vy-pop {
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.vy-pop {
+  animation: vy-pop 0.16s ease-out both;
+}
+@keyframes vy-eq {
+  0%,
+  100% {
+    transform: scaleY(0.3);
+  }
+  50% {
+    transform: scaleY(1);
+  }
+}
+.vy-eq span {
+  display: block;
+  width: 3px;
+  border-radius: 2px;
+  background: var(--vy-accent);
+  transform-origin: bottom;
+  animation: vy-eq 0.9s ease-in-out infinite;
+}
+.vy-eq span:nth-child(2) {
+  animation-delay: -0.3s;
+}
+.vy-eq span:nth-child(3) {
+  animation-delay: -0.6s;
+}
+.vy-eq.paused span {
+  animation-play-state: paused;
+}
+@keyframes vy-shimmer {
+  from {
+    background-position: -200% 0;
+  }
+  to {
+    background-position: 200% 0;
+  }
+}
+.vy-skeleton {
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--vy-text) 6%, transparent) 25%,
+    color-mix(in srgb, var(--vy-text) 12%, transparent) 50%,
+    color-mix(in srgb, var(--vy-text) 6%, transparent) 75%
+  );
+  background-size: 200% 100%;
+  animation: vy-shimmer 1.4s linear infinite;
+}
+
+/* ---------- lyrics ---------- */
+.vy-lyric {
+  transition: color 0.35s ease, opacity 0.35s ease, transform 0.35s ease, filter 0.35s ease;
+  transform-origin: left center;
+}
+.vy-lyric.past {
+  opacity: 0.38;
+}
+.vy-lyric.future {
+  opacity: 0.5;
+}
+.vy-lyric.active {
+  opacity: 1;
+  color: var(--vy-text);
+  transform: scale(1.02);
+}
+.vy-lyrics-mask {
+  mask-image: linear-gradient(to bottom, transparent 0, black 12%, black 82%, transparent 100%);
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0, black 12%, black 82%, transparent 100%);
+}
+
+.vy-row {
+  height: var(--vy-row);
+}
