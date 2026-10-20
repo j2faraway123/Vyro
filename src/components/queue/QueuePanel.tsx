@@ -3,6 +3,7 @@ import { useState } from "react";
 import { formatTime } from "../../lib/format";
 import { useLibrary } from "../../store/library";
 import { usePlayer } from "../../store/player";
+import { useYouTube } from "../../store/youtube";
 import { Artwork } from "../common/Artwork";
 import { Button, Equalizer, IconButton } from "../common/controls";
 
@@ -24,6 +25,7 @@ export function QueuePanel() {
   const upcoming = queue.slice(index + 1);
   const from = contextLabel(context, lib);
   const ytm = usePlayer((s) => s.source === "ytm");
+  const yt = usePlayer((s) => s.source === "yt");
 
   if (ytm)
     return (
@@ -32,6 +34,8 @@ export function QueuePanel() {
         <p className="mt-1 text-xs text-fg-2">Its queue is managed in the YouTube Music window. Play a local track to switch back to your library queue.</p>
       </div>
     );
+
+  if (yt) return <YouTubeQueue />;
 
   if (!queue.length)
     return (
@@ -107,6 +111,44 @@ export function QueuePanel() {
         <p className="px-2 text-xs text-fg-3">Nothing queued after this track.</p>
       )}
       {upcoming.length > 300 && <p className="px-2 pt-2 text-xs text-fg-3">and {upcoming.length - 300} more</p>}
+    </div>
+  );
+}
+
+function YouTubeQueue() {
+  const { queue, index, context, playAt, removeFromQueue } = useYouTube();
+  const playing = usePlayer((s) => s.playing);
+  return (
+    <div className="vy-scroll -mx-2 h-full px-2 pb-4">
+      <h3 className="mb-2 text-xs font-bold tracking-wider text-fg-3 uppercase">
+        YouTube{context ? <span className="font-medium normal-case"> · {context}</span> : null}
+      </h3>
+      <ul>
+        {queue.slice(0, 300).map((v, i) => (
+          <li key={`${v.videoId}-${i}`} onDoubleClick={() => playAt(i)} className="group flex items-center gap-2.5 rounded-vy-sm px-2 py-1.5 transition-colors hover:bg-fg/6">
+            <button type="button" onClick={() => playAt(i)} aria-label={`Play ${v.title}`} className="shrink-0">
+              <Artwork src={v.thumbnail} className="h-10 w-10" iconSize={14} />
+            </button>
+            <div className="min-w-0 flex-1">
+              <div className={`flex items-center gap-2 truncate text-sm font-semibold ${i === index ? "text-accent" : "text-fg"}`}>
+                {i === index && <Equalizer playing={playing} />}
+                <span className="truncate">{v.title}</span>
+              </div>
+              <div className="truncate text-xs text-fg-2">{v.artist}</div>
+            </div>
+            {i === index ? (
+              <span className="text-xs text-fg-3 tabular-nums">{formatTime(v.duration)}</span>
+            ) : (
+              <span className="opacity-0 transition-opacity group-hover:opacity-100 focus-within:opacity-100">
+                <IconButton label={`Remove ${v.title} from queue`} size="sm" onClick={() => removeFromQueue(i)}>
+                  <X size={15} />
+                </IconButton>
+              </span>
+            )}
+          </li>
+        ))}
+      </ul>
+      {queue.length > 300 && <p className="px-2 pt-2 text-xs text-fg-3">and {queue.length - 300} more</p>}
     </div>
   );
 }

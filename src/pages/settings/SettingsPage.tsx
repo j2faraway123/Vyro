@@ -1,15 +1,17 @@
-import { Info, Keyboard, Library, MicVocal, Palette, Play, Shield, Sparkles } from "lucide-react";
+import { Info, Keyboard, Library, MicVocal, MonitorPlay, Palette, Play, Shield, Sparkles } from "lucide-react";
 import type { ReactNode } from "react";
 import { useUi, type SettingsSection } from "../../store/ui";
 import { AppearanceSection } from "./AppearanceSection";
 import { BackgroundSection } from "./BackgroundSection";
 import { AboutSection, LibrarySection, LyricsSection, PlaybackSection, ShortcutsSection } from "./OtherSections";
 import { ShieldSection } from "./ShieldSection";
+import { YouTubeSection } from "./YouTubeSection";
 
 const SECTIONS: { id: SettingsSection; label: string; icon: ReactNode }[] = [
   { id: "appearance", label: "Appearance", icon: <Palette size={17} /> },
   { id: "background", label: "Background", icon: <Sparkles size={17} /> },
   { id: "shield", label: "Vyro Shield", icon: <Shield size={17} /> },
+  { id: "youtube", label: "YouTube", icon: <MonitorPlay size={17} /> },
   { id: "playback", label: "Playback", icon: <Play size={17} /> },
   { id: "lyrics", label: "Lyrics", icon: <MicVocal size={17} /> },
   { id: "library", label: "Library", icon: <Library size={17} /> },
@@ -45,6 +47,7 @@ export function SettingsPage({ section = "appearance" }: { section?: SettingsSec
         {section === "appearance" && <AppearanceSection />}
         {section === "background" && <BackgroundSection />}
         {section === "shield" && <ShieldSection />}
+        {section === "youtube" && <YouTubeSection />}
         {section === "playback" && <PlaybackSection />}
         {section === "lyrics" && <LyricsSection />}
         {section === "library" && <LibrarySection />}

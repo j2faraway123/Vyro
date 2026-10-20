@@ -89,6 +89,10 @@ export function createTauriBackend(): Backend {
     ytmClose: () => invoke("ytm_close"),
     ytmControl: (action, value) => invoke("ytm_control", { action, value: value ?? null }),
     ytmPalette: (url) => invoke("ytm_palette", { url }),
+    ytStatus: () => invoke("yt_status"),
+    ytSetKey: (key) => invoke("yt_set_key", { key }),
+    ytSearch: (query, page) => invoke("yt_search", { query, page: page ?? null }),
+    ytPlaylist: (input, page) => invoke("yt_playlist", { input, page: page ?? null }),
     lyricsLookup: (title, artist, album, duration) => invoke("lyrics_lookup", { title, artist, album, duration }),
 
     appInfo: () => invoke("app_info"),

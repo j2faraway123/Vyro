@@ -4,6 +4,7 @@ mod lyrics;
 mod palette;
 mod scanner;
 mod shield;
+mod youtube;
 mod ytm;
 
 use serde::Serialize;
@@ -211,13 +212,19 @@ fn playlist_add_tracks(state: State<AppState>, id: i64, track_ids: Vec<i64>) -> 
 
 #[tauri::command]
 fn settings_all(state: State<AppState>) -> CmdResult<HashMap<String, serde_json::Value>> {
-    db::settings(&*state.conn()?)
+    let mut all = db::settings(&*state.conn()?)?;
+    // The YouTube key is only handled by the yt_* commands.
+    all.remove(YT_KEY);
+    Ok(all)
 }
 
 #[tauri::command]
 fn settings_set(state: State<AppState>, key: String, value: serde_json::Value) -> CmdResult<()> {
     if key == "shield" {
         return Err("Use the Shield commands to change Shield settings".into());
+    }
+    if key == YT_KEY {
+        return Err("Use the YouTube settings to change the API key".into());
     }
     db::set_setting(&*state.conn()?, &key, &value)
 }
@@ -320,6 +327,71 @@ async fn ytm_palette(url: String) -> CmdResult<Vec<String>> {
 #[tauri::command]
 async fn lyrics_lookup(title: String, artist: String, album: String, duration: f64) -> CmdResult<lyrics::Lyrics> {
     tauri::async_runtime::spawn_blocking(move || lyrics::lookup(&title, &artist, &album, duration))
+        .await
+        .map_err(|e| e.to_string())?
+}
+
+// ---------------------------------------------------------------- YouTube (Data API)
+
+const YT_KEY: &str = "youtubeApiKey";
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct YtStatus {
+    has_key: bool,
+    /// Last four characters, so the key itself never goes back to the UI.
+    key_hint: Option<String>,
+}
+
+fn yt_key(state: &AppState) -> CmdResult<Option<String>> {
+    Ok(db::get_setting(&*state.conn()?, YT_KEY)?.and_then(|v| v.as_str().map(String::from)).filter(|k| !k.is_empty()))
+}
+
+fn yt_need_key(state: &AppState) -> CmdResult<String> {
+    yt_key(state)?.ok_or_else(|| "Add your YouTube API key first (Settings → YouTube).".to_string())
+}
+
+fn yt_status_of(key: Option<String>) -> YtStatus {
+    YtStatus { has_key: key.is_some(), key_hint: key.map(|k| k.chars().rev().take(4).collect::<Vec<_>>().into_iter().rev().collect()) }
+}
+
+#[tauri::command]
+fn yt_status(state: State<AppState>) -> CmdResult<YtStatus> {
+    Ok(yt_status_of(yt_key(&state)?))
+}
+
+#[tauri::command]
+async fn yt_set_key(app: AppHandle, key: Option<String>) -> CmdResult<YtStatus> {
+    let key = key.map(|k| k.trim().to_string()).filter(|k| !k.is_empty());
+    if let Some(k) = &key {
+        if k.len() > 200 || !k.chars().all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_') {
+            return Err("That doesn't look like a Google API key.".into());
+        }
+        let k = k.clone();
+        tauri::async_runtime::spawn_blocking(move || youtube::check_key(&k)).await.map_err(|e| e.to_string())??;
+    }
+    let state = app.state::<AppState>();
+    db::set_setting(&*state.conn()?, YT_KEY, &serde_json::json!(key.clone().unwrap_or_default()))?;
+    Ok(yt_status_of(key))
+}
+
+#[tauri::command]
+async fn yt_search(app: AppHandle, query: String, page: Option<String>) -> CmdResult<youtube::YtPage> {
+    let key = yt_need_key(&app.state::<AppState>())?;
+    tauri::async_runtime::spawn_blocking(move || youtube::search(&key, &query, page.as_deref())).await.map_err(|e| e.to_string())?
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct YtPlaylist {
+    title: String,
+    page: youtube::YtPage,
+}
+
+#[tauri::command]
+async fn yt_playlist(app: AppHandle, input: String, page: Option<String>) -> CmdResult<YtPlaylist> {
+    let key = yt_need_key(&app.state::<AppState>())?;
+    tauri::async_runtime::spawn_blocking(move || youtube::playlist(&key, &input, page.as_deref()).map(|(title, page)| YtPlaylist { title, page }))
         .await
         .map_err(|e| e.to_string())?
 }
@@ -689,6 +761,10 @@ pub fn run() {
             web_open,
             web_focus,
             web_close,
+            yt_status,
+            yt_set_key,
+            yt_search,
+            yt_playlist,
             ytm_open,
             ytm_close,
             ytm_control,

@@ -4,7 +4,7 @@ import { formatBytes, formatTime, relativeTime } from "../../lib/format";
 import { albumKey } from "../../lib/library";
 import type { Track } from "../../lib/types";
 import { useLibrary } from "../../store/library";
-import { useCurrentTrack } from "../../store/player";
+import { externalRoute, useCurrentTrack, usePlayer } from "../../store/player";
 import { useSettings } from "../../store/settings";
 import { useUi } from "../../store/ui";
 import { Artwork } from "../common/Artwork";
@@ -91,6 +91,7 @@ export function NowPlayingPanel() {
   const navigate = useUi((s) => s.navigate);
   const setFullscreen = useUi((s) => s.setFullscreenLyrics);
   const fav = track ? favorites.has(track.id) : false;
+  const youtube = usePlayer((s) => s.source === "yt");
 
   return (
     <aside aria-label="Now playing" className="vy-panel flex min-h-0 flex-col overflow-hidden p-4">
@@ -106,20 +107,25 @@ export function NowPlayingPanel() {
         </div>
       </div>
 
-      <div className={`${tab === "lyrics" ? "mx-auto w-[62%]" : "mx-auto w-[46%]"} transition-all duration-300`}>
-        <TiltArt track={track} />
-      </div>
+      {youtube ? (
+        // YouTube's player is laid over this slot (see store/youtube).
+        <div data-yt-slot className="aspect-video min-h-[200px] w-full rounded-vy bg-black/40" />
+      ) : (
+        <div className={`${tab === "lyrics" ? "mx-auto w-[62%]" : "mx-auto w-[46%]"} transition-all duration-300`}>
+          <TiltArt track={track} />
+        </div>
+      )}
 
       <div className="mt-4 flex items-start gap-2">
         <div className="min-w-0 flex-1">
           {track ? (
             <>
-              <button type="button" onClick={() => navigate(track.id < 0 ? { name: "ytm" } : { name: "album", key: albumKey(track) })} className="block max-w-full truncate text-left text-lg leading-tight font-extrabold text-fg hover:underline">
+              <button type="button" onClick={() => navigate(externalRoute(track) ?? { name: "album", key: albumKey(track) })} className="block max-w-full truncate text-left text-lg leading-tight font-extrabold text-fg hover:underline">
                 {track.title}
               </button>
               <button
                 type="button"
-                onClick={() => navigate(track.id < 0 ? { name: "ytm" } : { name: "artist", artist: track.albumArtist })}
+                onClick={() => navigate(externalRoute(track) ?? { name: "artist", artist: track.albumArtist })}
                 className="block max-w-full truncate text-left text-sm text-fg-2 hover:text-fg hover:underline"
               >
                 {track.artist}

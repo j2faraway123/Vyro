@@ -175,3 +175,33 @@ export interface AppInfo {
   platform: string;
   formats: string[];
 }
+
+/** A YouTube video found through the YouTube Data API. */
+export interface YtItem {
+  videoId: string;
+  /** Song title, cleaned up from the video title where it follows "Artist - Title". */
+  title: string;
+  artist: string;
+  rawTitle: string;
+  channel: string;
+  thumbnail: string | null;
+  duration: number;
+}
+
+export interface YtPage {
+  items: YtItem[];
+  nextPage: string | null;
+  /** Results left out because their owner doesn't allow playback outside YouTube. */
+  hidden: number;
+}
+
+export interface YtPlaylist {
+  title: string;
+  page: YtPage;
+}
+
+export interface YtStatus {
+  hasKey: boolean;
+  /** Last characters of the saved key, to recognise it. */
+  keyHint: string | null;
+}

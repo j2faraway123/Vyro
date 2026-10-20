@@ -12,9 +12,10 @@ export type Route =
   | { name: "recent" }
   | { name: "web" }
   | { name: "ytm" }
+  | { name: "youtube" }
   | { name: "settings"; section?: SettingsSection };
 
-export type SettingsSection = "appearance" | "background" | "shield" | "playback" | "lyrics" | "library" | "shortcuts" | "about";
+export type SettingsSection = "appearance" | "background" | "shield" | "youtube" | "playback" | "lyrics" | "library" | "shortcuts" | "about";
 
 export interface Toast {
   id: number;

@@ -7,6 +7,7 @@ import {
   History,
   Library,
   ListMusic,
+  MonitorPlay,
   PanelLeftClose,
   PanelLeftOpen,
   Plus,
@@ -87,6 +88,7 @@ export function Sidebar() {
         <NavItem icon={<Heart size={icon} />} label="Favorites" route={{ name: "favorites" }} collapsed={collapsed} />
         <NavItem icon={<ListMusic size={icon} />} label="Playlists" route={{ name: "playlists" }} collapsed={collapsed} />
         <NavItem icon={<History size={icon} />} label="Recently Played" route={{ name: "recent" }} collapsed={collapsed} />
+        <NavItem icon={<MonitorPlay size={icon} />} label="YouTube" route={{ name: "youtube" }} collapsed={collapsed} />
         <NavItem icon={<CirclePlay size={icon} />} label="YouTube Music" route={{ name: "ytm" }} collapsed={collapsed} />
         <NavItem
           icon={<Globe size={icon} />}

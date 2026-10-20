@@ -32,6 +32,11 @@ sign-in when YouTube changes its site; switch the option off, or add
 `music.youtube.com` to the allowlist, if that happens. The option takes effect
 straight away, without reopening the window.
 
+**YouTube player on the YouTube page.** Shield never filters it. It is
+YouTube's official embedded player running inside Vyro's main window, which
+Shield doesn't touch, so YouTube's ads play there as on any site with an
+embedded YouTube video.
+
 It does not promise ad-free playback on third-party streaming services. Ads
 that a service plays inside its own audio or video stream are part of that
 stream and are deliberately left alone. Vyro does not circumvent any

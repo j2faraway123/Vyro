@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 import { artUrl } from "../components/common/Artwork";
-import { usePlayer, useCurrentTrack } from "../store/player";
+import { usePlayer, useCurrentTrack, YTM_TRACK_ID } from "../store/player";
 
 /**
  * Publishes now-playing metadata to the OS media controls (on Windows,
@@ -15,7 +15,7 @@ export function useMediaSession() {
   useEffect(() => {
     if (!("mediaSession" in navigator)) return;
     const ms = navigator.mediaSession;
-    if (!track || track.id < 0) {
+    if (!track || track.id === YTM_TRACK_ID) {
       ms.metadata = null;
       return;
     }
@@ -30,7 +30,7 @@ export function useMediaSession() {
 
   useEffect(() => {
     if (!("mediaSession" in navigator)) return;
-    navigator.mediaSession.playbackState = track && track.id < 0 ? "none" : playing ? "playing" : "paused";
+    navigator.mediaSession.playbackState = track && track.id === YTM_TRACK_ID ? "none" : playing ? "playing" : "paused";
   }, [playing, track]);
 
   useEffect(() => {

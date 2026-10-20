@@ -6,8 +6,9 @@ album-reactive animated backgrounds, synced lyrics, a JSON theme engine and
 open from inside the app.
 
 It is a standalone app built with Tauri 2, React and TypeScript. It is not a
-client, mod or skin for any streaming service. It can also show and control
-YouTube Music, which you sign in to in its own Vyro window (see below).
+client, mod or skin for any streaming service. It can also search and play
+YouTube songs in its own screens through YouTube's official embedded player,
+and show and control YouTube Music in its own Vyro window (see below).
 
 ![Vyro playing an album on Linux](docs/screenshots/linux-album-playing.png)
 
@@ -25,10 +26,47 @@ More screenshots of the real app on Linux are in [docs/screenshots](docs/screens
 | Dynamic backgrounds | Done. Colours extracted from the artwork, smooth crossfades between songs, animated colour fields, blurred art, light waves, particles and parallax. Presets Aurora, Sunset, Ocean, Midnight and Ambient; static colour, custom gradient or your own image. Reduced-motion and performance modes. |
 | Themes | Done. Dark, light and more built in. Accent, corner radius, density, sidebar and panel layout; JSON import and export ([format](docs/THEMES.md)). |
 | Vyro Shield | Done on **Windows** and **Linux**; element hiding only on macOS. See [docs/SHIELD.md](docs/SHIELD.md) for exactly what it does and doesn't do. |
+| YouTube | New in 0.4.0. Search YouTube and open public playlists in Vyro's own screens, with your own free YouTube Data API key. Songs play through YouTube's official embedded player in the now-playing panel, with Vyro's controls, queue, artwork colours and LRCLIB lyrics. See *YouTube* below. Checked in the browser preview against a stand-in for YouTube's player; real YouTube playback was not reachable from the build machine. |
 | YouTube Music tab | New in 0.2.0; optional Shield filtering in 0.3.0. YouTube Music runs in its own Vyro window with your account; Vyro shows the song with its artwork colours, lyrics from LRCLIB and its own play, pause, skip and seek controls. See *YouTube Music* below. Tested on Linux against a stand-in page only; the real site was not reachable from the build machine. |
 | Other streaming services | Not included. |
 | Gapless playback and crossfade | Not implemented. |
 | macOS | Should build, but has not been tested. |
+
+## YouTube
+
+Open **YouTube** in the sidebar. The first time, Vyro asks for a YouTube Data
+API key, which is free:
+
+1. Sign in to [Google Cloud Console](https://console.cloud.google.com/apis/library/youtube.googleapis.com) and create a project.
+2. Enable *YouTube Data API v3* for it.
+3. Under *APIs & Services → Credentials*, choose *Create credentials → API key*.
+4. Paste the key into Vyro. Vyro checks it with YouTube and keeps it in its
+   database on your computer. You can replace or remove it in Settings → YouTube.
+
+Then search for songs or paste a playlist link. Click a result to play it, or
+*Play all* to queue the whole list. The video plays in YouTube's own player,
+which takes the place of the album art in the now-playing panel (or floats in a
+corner if the panel is closed). Vyro's playback bar, media keys, queue,
+background colours and lyrics follow it. Playing a local track pauses YouTube.
+
+Limits:
+
+- **YouTube's ads still play.** The player is YouTube's own, and Vyro Shield
+  doesn't touch it.
+- YouTube's terms require the player to stay visible and at least 200×200
+  pixels while it plays, so Vyro never hides it during playback.
+- Some videos can't play outside YouTube because their owners turned off
+  embedding. Vyro leaves them out of results and skips them in the queue.
+- The free allowance is 10,000 units a day. A search costs 100 (about 100
+  searches a day); opening a playlist page or playing costs about 1.
+- No sign-in: your likes, library and mixes aren't available here. Use the
+  YouTube Music window for those.
+
+How it works: searches go from Vyro's Rust backend to the YouTube Data API
+with your key, so the key never reaches the web page. Playback uses
+`youtube.com/embed` in an iframe and controls it with the embedded player's
+documented message protocol, without loading any YouTube script into Vyro's
+own window.
 
 ## YouTube Music
 
@@ -120,6 +158,8 @@ npm run dev &                                  # keep it running
 (cd e2e && npm install playwright-core)        # once
 node e2e/preview-smoke.mjs http://localhost:1420/
 # uses Chromium from CHROMIUM_PATH, default /opt/pw-browsers/chromium
+node e2e/yt-player-check.mjs http://localhost:1420/
+# YouTube player: answers youtube.com/embed with a stand-in player
 ```
 
 ## Build
@@ -147,9 +187,9 @@ npm run tauri build -- --bundles nsis,msi
 
 Output:
 
-- `src-tauri\target\release\bundle\nsis\Vyro_0.3.0_x64-setup.exe`, a
+- `src-tauri\target\release\bundle\nsis\Vyro_0.4.0_x64-setup.exe`, a
   per-user installer that needs no admin rights;
-- `src-tauri\target\release\bundle\msi\Vyro_0.3.0_x64_en-US.msi`.
+- `src-tauri\target\release\bundle\msi\Vyro_0.4.0_x64_en-US.msi`.
 
 Or let GitHub build it: [`.github/workflows/build.yml`](.github/workflows/build.yml)
 runs the tests on Linux and builds both installers on `windows-latest` for
@@ -232,18 +272,19 @@ src/                  React + TypeScript UI
   audio/              playback engine (HTMLAudioElement)
   components/         layout, background, lyrics, queue, shared controls
   lib/                pure logic: LRC parsing, colours, themes, queue, library, settings
-  pages/              Discover, Search, Library, Favorites, Playlists, Recent, YouTube Music, Web, Settings
-  store/              zustand stores (player, library, settings, ui, shield)
+  pages/              Discover, Search, Library, Favorites, Playlists, Recent, YouTube, YouTube Music, Web, Settings
+  store/              zustand stores (player, library, settings, ui, shield, youtube)
 src-tauri/src/
   db.rs               SQLite schema and queries
   scanner.rs          folder scan, tags, artwork cache
   palette.rs          artwork colour extraction
   lyrics.rs           sidecar, tag and LRCLIB lyrics
+  youtube.rs          YouTube Data API search and playlists
   ytm.rs              YouTube Music window and now-playing bridge
   shield/             Vyro Shield: engine, lists, Windows (WebView2) and Linux (WebKitGTK) hooks
   lib.rs              Tauri commands, events, windows
 docs/                 theme format, Shield details, example theme
-e2e/                  browser smoke test
+e2e/                  browser smoke test and YouTube player check
 ```
 
 ## Licence

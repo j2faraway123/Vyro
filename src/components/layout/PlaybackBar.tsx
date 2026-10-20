@@ -20,7 +20,7 @@ import { useState } from "react";
 import { formatTime } from "../../lib/format";
 import { albumKey } from "../../lib/library";
 import { useLibrary } from "../../store/library";
-import { useCurrentTrack, usePlayer } from "../../store/player";
+import { externalRoute, useCurrentTrack, usePlayer } from "../../store/player";
 import { useSettings } from "../../store/settings";
 import { useUi } from "../../store/ui";
 import { Artwork } from "../common/Artwork";
@@ -30,7 +30,7 @@ function Progress() {
   const position = usePlayer((s) => s.position);
   const duration = usePlayer((s) => s.duration);
   const seek = usePlayer((s) => s.seek);
-  const hasTrack = usePlayer((s) => s.index >= 0 || s.source === "ytm");
+  const hasTrack = usePlayer((s) => s.index >= 0 || s.source !== "local");
   const [drag, setDrag] = useState<number | null>(null);
   const shown = drag ?? position;
   return (
@@ -65,8 +65,9 @@ export function PlaybackBar() {
   const { rightPanel, rightTab } = useSettings((s) => s.settings);
   const update = useSettings((s) => s.update);
   const fav = track ? favorites.has(track.id) : false;
-  // Shuffle and repeat belong to the local queue; YouTube Music has its own.
+  // Shuffle and repeat belong to Vyro's queues; YouTube Music has its own.
   const ytm = p.source === "ytm";
+  const ext = p.source !== "local";
   const VolIcon = p.muted || p.volume === 0 ? VolumeX : p.volume < 0.33 ? Volume : p.volume < 0.7 ? Volume1 : Volume2;
   const openTab = (tab: "lyrics" | "queue") => update(rightPanel && rightTab === tab ? { rightPanel: false } : { rightPanel: true, rightTab: tab });
 
@@ -76,14 +77,14 @@ export function PlaybackBar() {
       <div className="flex min-w-0 items-center gap-3">
         {track ? (
           <>
-            <button type="button" onClick={() => navigate(track.id < 0 ? { name: "ytm" } : { name: "album", key: albumKey(track) })} aria-label={`Go to ${track.album || track.title}`} className="shrink-0">
+            <button type="button" onClick={() => navigate(externalRoute(track) ?? { name: "album", key: albumKey(track) })} aria-label={`Go to ${track.album || track.title}`} className="shrink-0">
               <Artwork src={track.artwork} className="h-14 w-14 shadow-lg" iconSize={20} />
             </button>
             <div className="min-w-0">
               <div className="truncate text-sm font-bold text-fg">{track.title}</div>
               <button
                 type="button"
-                onClick={() => navigate(track.id < 0 ? { name: "ytm" } : { name: "artist", artist: track.albumArtist })}
+                onClick={() => navigate(externalRoute(track) ?? { name: "artist", artist: track.albumArtist })}
                 className="block max-w-full truncate text-left text-xs text-fg-2 hover:text-fg hover:underline"
               >
                 {track.artist}
@@ -103,17 +104,17 @@ export function PlaybackBar() {
       {/* Transport */}
       <div className="flex min-w-0 flex-col items-center gap-1">
         <div className="flex items-center gap-2">
-          <IconButton label={p.shuffle ? "Shuffle on" : "Shuffle off"} active={p.shuffle && !ytm} size="sm" onClick={p.toggleShuffle} disabled={ytm}>
+          <IconButton label={p.shuffle ? "Shuffle on" : "Shuffle off"} active={p.shuffle && !ext} size="sm" onClick={p.toggleShuffle} disabled={ext}>
             <Shuffle size={17} />
           </IconButton>
-          <IconButton label="Previous" onClick={p.prev} disabled={p.index < 0 && !ytm}>
+          <IconButton label="Previous" onClick={p.prev} disabled={p.index < 0 && !ext}>
             <SkipBack size={19} fill="currentColor" />
           </IconButton>
           <button
             type="button"
             aria-label={p.playing ? "Pause" : "Play"}
             onClick={p.toggle}
-            disabled={!p.queue.length && !ytm}
+            disabled={!p.queue.length && !ext}
             className="flex h-10 w-10 items-center justify-center rounded-full bg-fg text-bg shadow-md transition-transform duration-150 hover:scale-105 active:scale-95 disabled:opacity-40"
           >
             {p.loading && p.playing ? (
@@ -124,7 +125,7 @@ export function PlaybackBar() {
               <Play size={18} fill="currentColor" className="ml-0.5" />
             )}
           </button>
-          <IconButton label="Next" onClick={() => p.next()} disabled={p.index < 0 && !ytm}>
+          <IconButton label="Next" onClick={() => p.next()} disabled={p.index < 0 && !ext}>
             <SkipForward size={19} fill="currentColor" />
           </IconButton>
           <IconButton

@@ -6,7 +6,7 @@
  * or fetch lyrics; those require the desktop app.
  */
 import type { Backend, BackendEvent } from "./backend";
-import type { Lyrics, Play, Playlist, ShieldState, Track } from "./types";
+import type { Lyrics, Play, Playlist, ShieldState, Track, YtItem } from "./types";
 import { DEFAULT_SHIELD_PREVIEW } from "./shield-defaults";
 
 interface DemoAlbum {
@@ -181,6 +181,13 @@ export function createPreviewBackend(): Backend {
   const settings = load<Record<string, unknown>>("settings", {});
   let themes = load<{ id: string }[]>("themes", []);
   const listeners = new Set<(e: BackendEvent) => void>();
+  const ytDemo = () => {
+    try {
+      return localStorage.getItem("vyro-yt-demo") === "1";
+    } catch {
+      return false;
+    }
+  };
   const desktopOnly = () => Promise.reject("This needs the Vyro desktop app; the browser preview uses demo data only.");
   const shield: ShieldState = DEFAULT_SHIELD_PREVIEW;
   const withCounts = () =>
@@ -304,6 +311,16 @@ export function createPreviewBackend(): Backend {
     ytmClose: desktopOnly,
     ytmControl: desktopOnly,
     ytmPalette: desktopOnly,
+    // The YouTube demo (for automated checks) is off unless localStorage has "vyro-yt-demo".
+    ytStatus: async () => (ytDemo() ? { hasKey: true, keyHint: "demo" } : { hasKey: false, keyHint: null }),
+    ytSetKey: desktopOnly,
+    ytSearch: async (query) => {
+      if (!ytDemo()) return desktopOnly();
+      const q = query.toLowerCase();
+      const items = YT_DEMO.filter((i) => q === "demo" || `${i.title} ${i.artist}`.toLowerCase().includes(q));
+      return { items, nextPage: null, hidden: 1 };
+    },
+    ytPlaylist: async () => (ytDemo() ? { title: "Demo playlist", page: { items: YT_DEMO, nextPage: null, hidden: 0 } } : desktopOnly()),
     lyricsLookup: desktopOnly,
 
     appInfo: async () => ({ version: "0.1.0", dataDir: "(browser preview)", platform: "browser", formats: ["wav"] }),
@@ -327,3 +344,18 @@ export function createPreviewBackend(): Backend {
     },
   };
 }
+
+const ytDemoItem = (videoId: string, title: string, artist: string, duration: number): YtItem => ({
+  videoId,
+  title,
+  artist,
+  rawTitle: `${artist} - ${title}`,
+  channel: `${artist} - Topic`,
+  thumbnail: null,
+  duration,
+});
+const YT_DEMO: YtItem[] = [
+  ytDemoItem("vyroDemo001", "Night Signal", "Demo Artist", 6),
+  ytDemoItem("vyroBlocked", "Not Allowed Here", "Demo Artist", 200),
+  ytDemoItem("vyroDemo003", "Afterglow", "Second Demo", 180),
+];

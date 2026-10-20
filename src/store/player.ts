@@ -7,15 +7,41 @@ import { useLibrary } from "./library";
 import { useSettings } from "./settings";
 import { toast } from "./ui";
 
-/** "ytm": YouTube Music (in its Vyro window) is the active player. */
-export type PlaybackSource = "local" | "ytm";
+/**
+ * "ytm": YouTube Music (in its Vyro window) is the active player.
+ * "yt": a YouTube video in Vyro's embedded player is the active player.
+ */
+export type PlaybackSource = "local" | "ytm" | "yt";
 
 /** Id used for the synthesized track that stands for YouTube Music's song. */
 export const YTM_TRACK_ID = -1;
+/** Id used for the synthesized track of a YouTube video in Vyro's player. */
+export const YT_TRACK_ID = -2;
 
-interface YtmLive extends YtmState {
+interface Live {
+  playing: boolean;
+  position: number;
+  duration: number;
   /** performance.now() when this report arrived, to extrapolate position. */
   at: number;
+}
+
+type YtmLive = YtmState & Live;
+
+export type ExternalAction = "toggle" | "play" | "pause" | "next" | "prev" | "seek";
+
+/** What the embedded YouTube player reports. */
+export interface YtReport {
+  track: Track;
+  playing: boolean;
+  position: number;
+  duration: number;
+}
+
+/** Controls the embedded YouTube player (registered by store/youtube). */
+let ytControl: ((action: ExternalAction, value?: number) => void) | null = null;
+export function registerYouTubeControl(fn: typeof ytControl) {
+  ytControl = fn;
 }
 
 interface PlayerState {
@@ -23,7 +49,11 @@ interface PlayerState {
   ytm: YtmLive | null;
   ytmTrack: Track | null;
   setYtm: (s: YtmState | null) => void;
-  /** Switches back from YouTube Music and resumes the local queue. */
+  yt: Live | null;
+  ytTrack: Track | null;
+  /** Reports the embedded YouTube player's state; `activate` makes it the active player. */
+  setYt: (s: YtReport | null, activate?: boolean) => void;
+  /** Switches back from YouTube or YouTube Music and resumes the local queue. */
   playLocal: () => void;
   queue: number[];
   /** The queue in its original (unshuffled) order. */
@@ -97,17 +127,25 @@ function ytmTrackFor(y: YtmState, palette: string[] | null): Track {
 }
 
 const ytmKey = (y: YtmState) => [y.title, y.artist, y.album, y.artwork, Math.round(y.duration)].join("\u0000");
-let ytmTicker: ReturnType<typeof setInterval> | null = null;
+let extTicker: ReturnType<typeof setInterval> | null = null;
 const ytmPalettes = new Map<string, string[]>();
 
 /** Current playback time in seconds for whichever source is active. */
 export function playerTime(): number {
-  const { source, ytm } = usePlayer.getState();
-  if (source === "ytm" && ytm) {
-    const t = ytm.playing ? ytm.position + (performance.now() - ytm.at) / 1000 : ytm.position;
-    return ytm.duration > 0 ? Math.min(t, ytm.duration) : t;
+  const { source, ytm, yt } = usePlayer.getState();
+  const live = source === "ytm" ? ytm : source === "yt" ? yt : null;
+  if (live) {
+    const t = live.playing ? live.position + (performance.now() - live.at) / 1000 : live.position;
+    return live.duration > 0 ? Math.min(t, live.duration) : t;
   }
   return engine.time;
+}
+
+/** The page that a synthesized (non-library) track belongs to. */
+export function externalRoute(track: Track): { name: "ytm" } | { name: "youtube" } | null {
+  if (track.id === YTM_TRACK_ID) return { name: "ytm" };
+  if (track.id === YT_TRACK_ID) return { name: "youtube" };
+  return null;
 }
 
 let queueSaveTimer: ReturnType<typeof setTimeout> | null = null;
@@ -132,19 +170,35 @@ function persistPlayback(patch: Partial<{ volume: number; muted: boolean; shuffl
 }
 
 export const usePlayer = create<PlayerState>((set, get) => {
-  const ytm = (action: "toggle" | "play" | "pause" | "next" | "prev" | "seek", value?: number) =>
+  const ytmCtl = (action: ExternalAction, value?: number) =>
     backend()
       .ytmControl(action, value)
       .catch((e) => toast(`YouTube Music: ${e}`, "error"));
+  const control = (action: ExternalAction, value?: number) => {
+    if (get().source === "ytm") void ytmCtl(action, value);
+    else ytControl?.(action, value);
+  };
   const isYtm = () => get().source === "ytm";
-  /** Hands playback back to the local engine (YouTube Music is paused). */
-  const takeOver = () => {
-    if (!isYtm()) return;
-    if (get().ytm?.playing) void ytm("pause");
-    if (ytmTicker) clearInterval(ytmTicker);
-    ytmTicker = null;
+  const isExt = () => get().source !== "local";
+  const stopTicker = () => {
+    if (extTicker) clearInterval(extTicker);
+    extTicker = null;
+  };
+  /** Pauses the other external player when one of them takes over. */
+  const pauseOther = (taking: PlaybackSource) => {
+    if (taking !== "ytm" && get().ytm?.playing) void ytmCtl("pause");
+    if (taking !== "yt" && get().yt?.playing) ytControl?.("pause");
+  };
+  const localState = () => {
     const local = trackById(get().queue[get().index]);
-    set({ source: "local", playing: false, position: engine.time, duration: engine.duration || local?.duration || 0 });
+    return { source: "local" as const, playing: false, position: engine.time, duration: engine.duration || local?.duration || 0 };
+  };
+  /** Hands playback back to the local engine (the external player is paused). */
+  const takeOver = () => {
+    if (!isExt()) return;
+    pauseOther("local");
+    stopTicker();
+    set(localState());
   };
 
   const load = (index: number, autoplay: boolean, startAt = 0) => {
@@ -166,17 +220,17 @@ export const usePlayer = create<PlayerState>((set, get) => {
   };
 
   // Wire engine events once.
-  engine.on("play", () => !isYtm() && set({ playing: true }));
-  engine.on("pause", () => !isYtm() && set({ playing: false }));
+  engine.on("play", () => !isExt() && set({ playing: true }));
+  engine.on("pause", () => !isExt() && set({ playing: false }));
   engine.on("canplay", () => {
-    if (isYtm()) return;
+    if (isExt()) return;
     consecutiveErrors = 0;
     set({ loading: false });
   });
-  engine.on("loading", () => !isYtm() && set({ loading: true }));
-  engine.on("duration", () => !isYtm() && set({ duration: engine.duration || get().duration }));
+  engine.on("loading", () => !isExt() && set({ loading: true }));
+  engine.on("duration", () => !isExt() && set({ duration: engine.duration || get().duration }));
   engine.on("time", () => {
-    if (isYtm()) return;
+    if (isExt()) return;
     const t = engine.time;
     set({ position: t });
     const cur = get().current();
@@ -185,8 +239,9 @@ export const usePlayer = create<PlayerState>((set, get) => {
       useLibrary.getState().recordPlay(cur.id);
     }
   });
-  engine.on("ended", () => !isYtm() && get().next(true));
+  engine.on("ended", () => !isExt() && get().next(true));
   engine.on("error", (msg) => {
+    if (isExt()) return;
     const cur = get().current();
     if (!cur) return;
     consecutiveErrors += 1;
@@ -198,10 +253,10 @@ export const usePlayer = create<PlayerState>((set, get) => {
     }
   });
 
-  const applyYtm = (y: YtmLive) => {
+  const applyLive = (y: Live) => {
     set({ playing: y.playing, position: y.position, duration: y.duration || get().duration, loading: false, error: null });
-    if (ytmTicker) clearInterval(ytmTicker);
-    ytmTicker = y.playing ? setInterval(() => isYtm() && set({ position: playerTime() }), 250) : null;
+    stopTicker();
+    extTicker = y.playing ? setInterval(() => isExt() && set({ position: playerTime() }), 250) : null;
   };
 
   return {
@@ -212,12 +267,33 @@ export const usePlayer = create<PlayerState>((set, get) => {
       takeOver();
       get().play();
     },
+    yt: null,
+    ytTrack: null,
+    setYt: (s, activate = false) => {
+      if (!s) {
+        const was = get().source === "yt";
+        if (was) stopTicker();
+        set({ yt: null, ytTrack: null });
+        if (was) set(localState());
+        return;
+      }
+      const y: Live = { playing: s.playing, position: s.position, duration: s.duration, at: performance.now() };
+      set({ yt: y, ytTrack: s.track });
+      // Only an explicit play makes it active: a late "playing" report after
+      // another source took over must not steal playback back.
+      if (get().source !== "yt" && activate) {
+        engine.pause();
+        pauseOther("yt");
+        set({ source: "yt" });
+      }
+      if (get().source === "yt") applyLive(y);
+    },
     setYtm: (s) => {
       if (!s || !s.active) {
-        if (ytmTicker) clearInterval(ytmTicker);
-        ytmTicker = null;
-        const wasYtm = isYtm();
-        set({ ytm: null, ytmTrack: null, ...(wasYtm ? { source: "local" as const, playing: false, position: engine.time, duration: engine.duration || get().current()?.duration || 0 } : {}) });
+        const was = isYtm();
+        if (was) stopTicker();
+        set({ ytm: null, ytmTrack: null });
+        if (was) set(localState());
         return;
       }
       const live: YtmLive = { ...s, at: performance.now() };
@@ -238,12 +314,13 @@ export const usePlayer = create<PlayerState>((set, get) => {
         }
       }
       set({ ytm: live });
-      if (!isYtm() && (s.playing || get().index < 0)) {
-        // YouTube Music started playing (or nothing local is loaded): it becomes the active player.
+      if (!isYtm() && (s.playing || (get().source === "local" && get().index < 0))) {
+        // YouTube Music started playing (or nothing else is loaded): it becomes the active player.
         engine.pause();
+        pauseOther("ytm");
         set({ source: "ytm" });
       }
-      if (isYtm()) applyYtm(live);
+      if (isYtm()) applyLive(live);
     },
     queue: [],
     original: [],
@@ -259,7 +336,7 @@ export const usePlayer = create<PlayerState>((set, get) => {
     repeat: "off",
     error: null,
 
-    current: () => (isYtm() ? get().ytmTrack : trackById(get().queue[get().index])),
+    current: () => (isYtm() ? get().ytmTrack : get().source === "yt" ? get().ytTrack : trackById(get().queue[get().index])),
 
     playTracks: (ids, start = 0, context) => {
       if (!ids.length) return;
@@ -275,21 +352,21 @@ export const usePlayer = create<PlayerState>((set, get) => {
       load(index, true);
     },
     toggle: () => {
-      if (isYtm()) return void ytm("toggle");
+      if (isExt()) return control("toggle");
       const { index, queue } = get();
       if (index < 0 && queue.length) return load(0, true);
       if (engine.paused) get().play();
       else get().pause();
     },
     play: () => {
-      if (isYtm()) return void ytm("play");
+      if (isExt()) return control("play");
       if (get().index < 0) return;
       if (!engine.el.src) return load(get().index, true, get().position);
       engine.play().catch((e) => toast(`Couldn't start playback: ${e}`, "error"));
     },
-    pause: () => (isYtm() ? void ytm("pause") : engine.pause()),
+    pause: () => (isExt() ? control("pause") : engine.pause()),
     next: (auto = false) => {
-      if (isYtm()) return void ytm("next");
+      if (isExt()) return control("next");
       const { index, queue, repeat } = get();
       const n = nextIndex(index, queue.length, repeat, auto);
       if (n === null) {
@@ -307,7 +384,7 @@ export const usePlayer = create<PlayerState>((set, get) => {
       load(n, true);
     },
     prev: () => {
-      if (isYtm()) return void ytm("prev");
+      if (isExt()) return control("prev");
       const { index, queue, repeat } = get();
       if (engine.time > 3) {
         engine.seek(0);
@@ -317,10 +394,12 @@ export const usePlayer = create<PlayerState>((set, get) => {
       if (p !== null) load(p, true);
     },
     seek: (t) => {
-      if (isYtm()) {
-        const y = get().ytm;
-        if (y) set({ ytm: { ...y, position: t, at: performance.now() }, position: t });
-        return void ytm("seek", t);
+      if (isExt()) {
+        const at = performance.now();
+        const { ytm, yt } = get();
+        if (isYtm() && ytm) set({ ytm: { ...ytm, position: t, at }, position: t });
+        else if (!isYtm() && yt) set({ yt: { ...yt, position: t, at }, position: t });
+        return control("seek", t);
       }
       engine.seek(t);
       set({ position: t });
@@ -427,8 +506,8 @@ export const usePlayer = create<PlayerState>((set, get) => {
 
 export function useCurrentTrack(): Track | null {
   const id = usePlayer((s) => s.queue[s.index]);
-  const ytmTrack = usePlayer((s) => (s.source === "ytm" ? s.ytmTrack : null));
+  const external = usePlayer((s) => (s.source === "ytm" ? s.ytmTrack : s.source === "yt" ? s.ytTrack : null));
   const byId = useLibrary((s) => s.byId);
-  if (ytmTrack) return ytmTrack;
+  if (external) return external;
   return id === undefined ? null : (byId.get(id) ?? null);
 }

@@ -11,6 +11,9 @@ import type {
   Track,
   WebWindowStats,
   YtmState,
+  YtPage,
+  YtPlaylist,
+  YtStatus,
 } from "./types";
 
 export type BackendEvent =
@@ -79,6 +82,12 @@ export interface Backend {
   ytmClose(): Promise<void>;
   ytmControl(action: "toggle" | "play" | "pause" | "next" | "prev" | "seek", value?: number): Promise<void>;
   ytmPalette(artworkUrl: string): Promise<string[]>;
+  ytStatus(): Promise<YtStatus>;
+  /** Checks the key with YouTube, then saves it; null removes it. */
+  ytSetKey(key: string | null): Promise<YtStatus>;
+  ytSearch(query: string, page?: string | null): Promise<YtPage>;
+  /** Takes a playlist link or id. */
+  ytPlaylist(input: string, page?: string | null): Promise<YtPlaylist>;
   lyricsLookup(title: string, artist: string, album: string, duration: number): Promise<Lyrics>;
 
   appInfo(): Promise<AppInfo>;

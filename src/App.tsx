@@ -19,6 +19,7 @@ import { Library } from "./pages/Library";
 import { Search } from "./pages/Search";
 import { SettingsPage } from "./pages/settings/SettingsPage";
 import { WebPage } from "./pages/Web";
+import { YouTubePage } from "./pages/YouTube";
 import { YouTubeMusicPage } from "./pages/YouTubeMusic";
 import { useLibrary } from "./store/library";
 import { usePlayer } from "./store/player";
@@ -105,6 +106,8 @@ function Page() {
       return <WebPage />;
     case "ytm":
       return <YouTubeMusicPage />;
+    case "youtube":
+      return <YouTubePage />;
     case "settings":
       return <SettingsPage section={route.section} />;
   }
