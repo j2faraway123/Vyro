@@ -25,7 +25,7 @@ More screenshots of the real app on Linux are in [docs/screenshots](docs/screens
 | Dynamic backgrounds | Done. Colours extracted from the artwork, smooth crossfades between songs, animated colour fields, blurred art, light waves, particles and parallax. Presets Aurora, Sunset, Ocean, Midnight and Ambient; static colour, custom gradient or your own image. Reduced-motion and performance modes. |
 | Themes | Done. Dark, light and more built in. Accent, corner radius, density, sidebar and panel layout; JSON import and export ([format](docs/THEMES.md)). |
 | Vyro Shield | Done on **Windows** and **Linux**; element hiding only on macOS. See [docs/SHIELD.md](docs/SHIELD.md) for exactly what it does and doesn't do. |
-| YouTube Music tab | New in 0.2.0. YouTube Music runs in its own Vyro window with your account; Vyro shows the song with its artwork colours, lyrics from LRCLIB and its own play, pause, skip and seek controls. See *YouTube Music* below. Tested on Linux against a stand-in page only; the real site was not reachable from the build machine. |
+| YouTube Music tab | New in 0.2.0; optional Shield filtering in 0.3.0. YouTube Music runs in its own Vyro window with your account; Vyro shows the song with its artwork colours, lyrics from LRCLIB and its own play, pause, skip and seek controls. See *YouTube Music* below. Tested on Linux against a stand-in page only; the real site was not reachable from the build machine. |
 | Other streaming services | Not included. |
 | Gapless playback and crossfade | Not implemented. |
 | macOS | Should build, but has not been tested. |
@@ -40,10 +40,15 @@ Music, and starting a song in YouTube Music pauses the local track.
 
 What it does not do:
 
-- **It doesn't block YouTube's ads.** Vyro Shield is not attached to the
-  YouTube Music window. YouTube's ads are part of its stream, and Vyro
-  doesn't interfere with streams, subscriptions or sign-in. YouTube Music
-  Premium removes them.
+- **It doesn't block YouTube's ads by default.** Vyro Shield leaves the
+  YouTube Music window alone unless you turn on *Also filter the YouTube
+  Music window* in Settings → Vyro Shield (new in 0.3.0). Then Shield refuses
+  matching ad requests and hides matching ad elements there, exactly as in
+  web windows. It never touches audio or video streams, so ads that YouTube
+  plays inside the music stream will probably still play. Filtering goes
+  against YouTube's terms and may break playback or sign-in when YouTube
+  changes its site; switch it off or allowlist music.youtube.com if it does.
+  YouTube Music Premium removes the ads properly.
 - It doesn't download, save or record anything, and YouTube songs don't enter
   your local library, favorites or history.
 - The queue, likes and playlists stay in YouTube Music.
@@ -142,9 +147,9 @@ npm run tauri build -- --bundles nsis,msi
 
 Output:
 
-- `src-tauri\target\release\bundle\nsis\Vyro_0.2.0_x64-setup.exe`, a
+- `src-tauri\target\release\bundle\nsis\Vyro_0.3.0_x64-setup.exe`, a
   per-user installer that needs no admin rights;
-- `src-tauri\target\release\bundle\msi\Vyro_0.2.0_x64_en-US.msi`.
+- `src-tauri\target\release\bundle\msi\Vyro_0.3.0_x64_en-US.msi`.
 
 Or let GitHub build it: [`.github/workflows/build.yml`](.github/workflows/build.yml)
 runs the tests on Linux and builds both installers on `windows-latest` for

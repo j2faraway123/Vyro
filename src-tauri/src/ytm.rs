@@ -2,7 +2,9 @@
 //!
 //! music.youtube.com runs in its own window, signed in with the user's own
 //! account, and plays through YouTube's own player. Vyro never touches the
-//! audio stream, ads or sign-in, and Vyro Shield is not attached here.
+//! audio stream or sign-in. Vyro Shield filters this window only when the user
+//! turns on its YouTube Music option, and then only the way it filters web
+//! windows: refusing matching requests and hiding matching elements.
 //!
 //! The window gets no IPC access. An initialization script reads the page's
 //! Media Session metadata (what the browser shows in the OS media overlay)
@@ -14,9 +16,10 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::{Mutex, OnceLock};
 use tauri::webview::NewWindowResponse;
+use tauri::webview::PageLoadEvent;
 use tauri::{AppHandle, Emitter, Manager, WebviewUrl, WebviewWindowBuilder, WindowEvent};
 
-pub const LABEL: &str = "ytm";
+pub const LABEL: &str = crate::shield::YTM_LABEL;
 const HOME: &str = "https://music.youtube.com/";
 const PREFIX: &str = "\u{2063}vyro:";
 
@@ -173,13 +176,15 @@ fn home() -> String {
     HOME.to_string()
 }
 
-pub fn open(app: &AppHandle, data_dir: &std::path::Path) -> Result<(), String> {
+pub fn open(app: &AppHandle, data_dir: &std::path::Path, shield: std::sync::Arc<crate::shield::Shield>) -> Result<(), String> {
     if let Some(w) = app.get_webview_window(LABEL) {
         let _ = w.unminimize();
         let _ = w.show();
         return w.set_focus().map_err(|e| e.to_string());
     }
     let title_app = app.clone();
+    let load_shield = shield.clone();
+    let load_app = app.clone();
     let window = WebviewWindowBuilder::new(app, LABEL, WebviewUrl::External(home().parse().map_err(|e| format!("Bad YouTube Music URL: {e}"))?))
         .title("YouTube Music · Vyro")
         .inner_size(1180.0, 820.0)
@@ -195,6 +200,16 @@ pub fn open(app: &AppHandle, data_dir: &std::path::Path) -> Result<(), String> {
                 NewWindowResponse::Deny
             }
         })
+        .on_page_load(move |w, payload| {
+            if matches!(payload.event(), PageLoadEvent::Started) {
+                load_shield.reset_window_count(w.label());
+            } else if load_shield.applies_to(w.label()) {
+                if let Some(js) = load_shield.cosmetic_script(payload.url().as_str()) {
+                    let _ = w.eval(&js);
+                }
+                let _ = load_app.emit_to("main", "shield-stats", load_shield.state().windows);
+            }
+        })
         .on_document_title_changed(move |w, title| {
             if let Some(state) = parse_report(&title) {
                 let _ = title_app.emit_to("main", "ytm-state", Some(state));
@@ -205,9 +220,20 @@ pub fn open(app: &AppHandle, data_dir: &std::path::Path) -> Result<(), String> {
         .build()
         .map_err(|e| format!("Could not open YouTube Music: {e}"))?;
 
+    // Requests are checked against `Shield::applies_to` on every call, so the
+    // hook can be attached up front and the YouTube Music option takes effect
+    // without reopening the window.
+    #[cfg(windows)]
+    crate::shield::windows::attach(&window, shield.clone())?;
+    #[cfg(target_os = "linux")]
+    crate::shield::linux::apply(&window, shield.clone())?;
+
     let close_app = app.clone();
     window.on_window_event(move |e| {
         if let WindowEvent::Destroyed = e {
+            let state = close_app.state::<crate::AppState>();
+            state.shield.window_closed(LABEL);
+            let _ = close_app.emit_to("main", "shield-stats", state.shield.state().windows);
             let _ = close_app.emit_to("main", "ytm-state", None::<YtmState>);
         }
     });

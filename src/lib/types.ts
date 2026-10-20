@@ -120,6 +120,8 @@ export interface ShieldConfig {
   lists: FilterList[];
   allowlist: string[];
   customRules: string;
+  /** Also filter the YouTube Music window (opt-in). */
+  youtubeMusic: boolean;
 }
 
 export interface ListStatus {

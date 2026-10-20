@@ -152,7 +152,7 @@ export function ShieldSection() {
   return (
     <Section
       title="Vyro Shield"
-      description="Optional ad and tracker blocking for pages you open in Vyro web windows (the Web page). It never filters your local music, the app itself, or audio and video streams."
+      description="Optional ad and tracker blocking for pages you open in Vyro web windows (the Web page), and for the YouTube Music window if you opt in below. It never filters your local music, the app itself, or audio and video streams."
     >
       <ShieldStatusCard />
       {preview && <ErrorBanner>Shield settings need the desktop app. The browser preview can't filter requests.</ErrorBanner>}
@@ -175,6 +175,22 @@ export function ShieldSection() {
         <Row label="Block pop-up windows" hint="Allowlisted sites can still open pop-ups (useful for sign-in windows).">
           <Toggle label="Block pop-ups" checked={cfg.blockPopups} onChange={(v) => setConfig({ blockPopups: v })} disabled={preview} />
         </Row>
+      </Group>
+
+      <Group title="YouTube Music">
+        <Row
+          label="Also filter the YouTube Music window"
+          hint="Off by default. Uses the same lists to refuse ad requests and hide ad banners there. Ads that YouTube plays inside the music stream will probably still play, because Shield never touches audio or video streams."
+        >
+          <Toggle label="Filter YouTube Music" checked={cfg.youtubeMusic} onChange={(v) => setConfig({ youtubeMusic: v })} disabled={preview} />
+        </Row>
+        {cfg.youtubeMusic && (
+          <ErrorBanner>
+            <AlertTriangle size={14} className="mr-1 inline" /> Blocking ads on YouTube Music goes against YouTube's terms of service, and YouTube changes its site often,
+            so songs may stop loading or sign-in may fail. If that happens, switch this off or add music.youtube.com to the allowlist. Changes apply straight away; reload the
+            YouTube Music window if a page is half loaded.
+          </ErrorBanner>
+        )}
       </Group>
 
       <Group

@@ -296,7 +296,7 @@ fn lyrics_clear_cache(state: State<AppState>) -> CmdResult<()> {
 
 #[tauri::command]
 fn ytm_open(app: AppHandle, state: State<AppState>) -> CmdResult<()> {
-    ytm::open(&app, &state.data_dir)
+    ytm::open(&app, &state.data_dir, state.shield.clone())
 }
 
 #[tauri::command]
@@ -347,7 +347,7 @@ fn refresh_web_windows(app: &AppHandle) {
     {
         let shield = app.state::<AppState>().shield.clone();
         for (label, w) in app.webview_windows() {
-            if label.starts_with("web-") {
+            if label.starts_with("web-") || label == shield::YTM_LABEL {
                 let _ = shield::linux::apply(&w, shield.clone());
             }
         }
@@ -370,7 +370,8 @@ fn shield_set_config(app: AppHandle, state: State<AppState>, config: shield::Shi
     let rules_changed = prev.lists != config.lists
         || prev.custom_rules != config.custom_rules
         || prev.tracker_protection != config.tracker_protection;
-    let needs_refresh = rules_changed || prev.enabled != config.enabled || prev.allowlist != config.allowlist || prev.cosmetic_filtering != config.cosmetic_filtering;
+    let needs_refresh = rules_changed || prev.enabled != config.enabled || prev.allowlist != config.allowlist || prev.cosmetic_filtering != config.cosmetic_filtering
+        || prev.youtube_music != config.youtube_music;
     *state.shield.config.write().unwrap() = config;
     save_shield_config(&state)?;
     if rules_changed {

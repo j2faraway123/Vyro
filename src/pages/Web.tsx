@@ -46,6 +46,7 @@ export function WebPage() {
   const [url, setUrl] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const webWindows = state?.windows.filter((w) => w.label.startsWith("web-")) ?? [];
 
   const open = async (target: string) => {
     if (!target.trim()) return;
@@ -98,16 +99,16 @@ export function WebPage() {
       )}
 
       <h2 className="mt-10 mb-3 text-lg font-bold text-fg">Open web windows</h2>
-      {state?.windows.length ? (
+      {webWindows.length ? (
         <ul className="space-y-2">
-          {state.windows.map((w) => (
+          {webWindows.map((w) => (
             <li key={w.label} className="vy-elevated rounded-vy p-4">
               <div className="flex items-center gap-3">
                 <Globe size={16} className="text-fg-2" />
                 <button type="button" className="min-w-0 flex-1 truncate text-left text-sm font-semibold text-fg hover:underline" onClick={() => backend().webFocus(w.label)}>
                   {w.url || "Loading…"}
                 </button>
-                {(state.platform.blockCounts || w.blocked > 0) && (
+                {(state?.platform.blockCounts || w.blocked > 0) && (
                   <span className="rounded-full bg-accent/15 px-2.5 py-0.5 text-xs font-bold text-accent">{plural(w.blocked, "blocked request")}</span>
                 )}
                 <IconButton label="Close window" size="sm" onClick={() => backend().webClose(w.label)}>

@@ -13,6 +13,7 @@ export const DEFAULT_SHIELD_PREVIEW: ShieldState = {
     ],
     allowlist: [],
     customRules: "",
+    youtubeMusic: false,
   },
   statuses: {},
   engine: { ready: false, building: false, networkRules: 0, cosmeticRules: 0, error: null, builtAt: null, revision: 0 },

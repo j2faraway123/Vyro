@@ -136,7 +136,7 @@ unsafe extern "C" fn on_ready(source: *mut gobject_ffi::GObject, res: *mut gio_f
 /// on first use and whenever the rule set changes; until it finishes the page
 /// loads unfiltered.
 pub fn apply<R: Runtime>(window: &WebviewWindow<R>, shield: Arc<Shield>) -> Result<(), String> {
-    let json = content_rules_json(&shield);
+    let json = if shield.applies_to(window.label()) { content_rules_json(&shield) } else { None };
     let store_dir = shield.dir().join("webkit");
     window
         .with_webview(move |pw| {

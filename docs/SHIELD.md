@@ -20,8 +20,17 @@ It never filters:
 - sign-in, DRM, licence or subscription checks. Shield does not rewrite,
   replay or alter any request. It can only let a request through or refuse it.
 
-Shield is **not attached to the YouTube Music window**. Ads there play as
-they do on the website; YouTube Music Premium removes them.
+**YouTube Music window.** Shield leaves it alone by default, so ads play as
+they do on the website (YouTube Music Premium removes them). You can opt in
+with **Settings → Vyro Shield → Also filter the YouTube Music window**. Shield
+then applies the same lists there: it refuses matching requests and hides
+matching elements, nothing more. It doesn't inject scripts into YouTube's
+player or rewrite its responses, and media requests are still always allowed,
+so ads that YouTube streams like songs will probably still play. Filtering
+YouTube goes against YouTube's terms of service and can break playback or
+sign-in when YouTube changes its site; switch the option off, or add
+`music.youtube.com` to the allowlist, if that happens. The option takes effect
+straight away, without reopening the window.
 
 It does not promise ad-free playback on third-party streaming services. Ads
 that a service plays inside its own audio or video stream are part of that

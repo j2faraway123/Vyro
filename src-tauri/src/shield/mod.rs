@@ -55,7 +55,13 @@ pub struct ShieldConfig {
     pub allowlist: Vec<String>,
     /// Extra user rules in Adblock Plus syntax.
     pub custom_rules: String,
+    /// Also filter the YouTube Music window. Off by default: it goes against
+    /// YouTube's terms and can break playback when YouTube changes its site.
+    pub youtube_music: bool,
 }
+
+/// Label of the YouTube Music window (see `ytm.rs`).
+pub const YTM_LABEL: &str = "ytm";
 
 pub fn default_lists() -> Vec<FilterList> {
     let l = |id: &str, name: &str, url: &str, homepage: &str, license: &str, category: &str, enabled: bool| FilterList {
@@ -102,6 +108,7 @@ impl Default for ShieldConfig {
             lists: default_lists(),
             allowlist: vec![],
             custom_rules: String::new(),
+            youtube_music: false,
         }
     }
 }
@@ -493,8 +500,17 @@ impl Shield {
     }
 
     /// Called from platform hooks (WebView2 on Windows). Returns true when the request must be blocked.
+    /// Whether Shield filters the window with this label at all. Web windows
+    /// always are; the YouTube Music window only when the user opted in.
+    pub fn applies_to(&self, label: &str) -> bool {
+        label.starts_with("web-") || (label == YTM_LABEL && self.config.read().unwrap().youtube_music)
+    }
+
     #[cfg_attr(not(windows), allow(dead_code))]
     pub fn check(&self, label: &str, url: &str, source_url: &str, request_type: &str) -> bool {
+        if !self.applies_to(label) {
+            return false;
+        }
         let mut request_type = request_type;
         let mut top_level = false;
         if request_type == "document" {
@@ -615,6 +631,23 @@ mod tests {
         let st = s.state();
         assert_eq!(st.total_blocked, 1);
         assert_eq!(st.windows[0].blocked, 1);
+    }
+
+    #[test]
+    fn youtube_music_window_is_filtered_only_when_opted_in() {
+        let s = shield_with_rules("||ads.example.net^\n");
+        let ad = "https://ads.example.net/pagead.js";
+        let page = "https://music.youtube.com/";
+        assert!(!s.check(YTM_LABEL, ad, page, "script"));
+        assert!(!s.applies_to(YTM_LABEL));
+        assert!(!s.applies_to("main"));
+        s.config.write().unwrap().youtube_music = true;
+        assert!(s.applies_to(YTM_LABEL));
+        assert!(s.check(YTM_LABEL, ad, page, "script"));
+        // Streams stay untouched there too.
+        assert!(!s.check(YTM_LABEL, "https://ads.example.net/a.webm", page, "media"));
+        s.config.write().unwrap().allowlist = vec!["music.youtube.com".into()];
+        assert!(!s.check(YTM_LABEL, ad, page, "script"));
     }
 
     #[test]
