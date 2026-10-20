@@ -301,6 +301,8 @@ export function createPreviewBackend(): Backend {
     webFocus: desktopOnly,
     webClose: desktopOnly,
     ytmOpen: desktopOnly,
+    ytmSetBounds: async () => {},
+    ytmReload: desktopOnly,
     ytmClose: desktopOnly,
     ytmControl: desktopOnly,
     ytmPalette: desktopOnly,

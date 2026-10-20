@@ -19,7 +19,18 @@ export type BackendEvent =
   | { type: "shield-changed"; payload: ShieldState }
   | { type: "shield-stats"; payload: WebWindowStats[] }
   | { type: "files-dropped"; payload: string[] }
-  | { type: "ytm-state"; payload: YtmState | null };
+  | { type: "ytm-state"; payload: YtmState | null }
+  | { type: "ytm-closed" };
+
+/** "window": YouTube Music opened in its own window (Linux). */
+export type YtmMode = "embedded" | "window";
+
+export interface YtmBounds {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
 
 export interface Backend {
   /** True in the browser preview (no desktop runtime): demo data only. */
@@ -75,7 +86,11 @@ export interface Backend {
   webOpen(url: string): Promise<string>;
   webFocus(label: string): Promise<void>;
   webClose(label: string): Promise<void>;
-  ytmOpen(): Promise<void>;
+  /** Shows YouTube Music inside the main window at `bounds` (CSS pixels). */
+  ytmOpen(bounds: YtmBounds): Promise<YtmMode>;
+  /** Moves the embedded page, or hides it (it keeps playing) with null. */
+  ytmSetBounds(bounds: YtmBounds | null): Promise<void>;
+  ytmReload(): Promise<void>;
   ytmClose(): Promise<void>;
   ytmControl(action: "toggle" | "play" | "pause" | "next" | "prev" | "seek", value?: number): Promise<void>;
   ytmPalette(artworkUrl: string): Promise<string[]>;

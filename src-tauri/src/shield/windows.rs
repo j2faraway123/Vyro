@@ -4,7 +4,7 @@
 
 use super::Shield;
 use std::sync::Arc;
-use tauri::{Runtime, WebviewWindow};
+use tauri::{Runtime, Webview};
 use webview2_com::Microsoft::Web::WebView2::Win32::*;
 use webview2_com::{take_pwstr, WebResourceRequestedEventHandler};
 use windows::core::{w, Interface, PWSTR};
@@ -26,7 +26,7 @@ fn context_name(ctx: COREWEBVIEW2_WEB_RESOURCE_CONTEXT) -> &'static str {
     }
 }
 
-pub fn attach<R: Runtime>(window: &WebviewWindow<R>, shield: Arc<Shield>) -> Result<(), String> {
+pub fn attach<R: Runtime>(window: &Webview<R>, shield: Arc<Shield>) -> Result<(), String> {
     let label = window.label().to_string();
     window
         .with_webview(move |pw| unsafe {

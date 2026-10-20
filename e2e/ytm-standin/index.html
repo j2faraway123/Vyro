@@ -1,0 +1,21 @@
+<!doctype html><html><head><title>Stand-in YouTube Music</title></head><body style="background:#111;color:#eee;font-family:sans-serif">
+<!-- Stand-in for music.youtube.com used to test Vyro's YouTube Music bridge offline. Debug builds load it via VYRO_YTM_URL. -->
+<h1>Stand-in YouTube Music</h1>
+<video id="v" src="a.wav" controls style="width:400px;height:60px"></video>
+<ytmusic-player-bar>
+<button id="play-pause-button" onclick="v.paused?v.play():v.pause()">play/pause</button>
+<button class="previous-button" onclick="go(-1)">prev</button>
+<button class="next-button" onclick="go(1)">next</button>
+</ytmusic-player-bar>
+<pre id="log"></pre>
+<div class="ad-slot" style="background:#c33;padding:20px">AD SLOT</div>
+<p>ad image: <img id="adimg" src="ads/banner.svg" width="80" onload="this.dataset.s=1" onerror="document.getElementById('adst').textContent='ad image blocked'"> <span id="adst"></span></p>
+<button onclick="location.reload()">reload</button>
+<script>
+const songs=[{title:"Here Comes the Sun",artist:"The Beatles",album:"Abbey Road",src:"a.wav"},{title:"Bohemian Rhapsody",artist:"Queen",album:"A Night at the Opera",src:"b.wav"}];
+let i=0;
+function setMeta(){navigator.mediaSession.metadata=new MediaMetadata({title:songs[i].title,artist:songs[i].artist,album:songs[i].album,artwork:[{src:"https://lh3.googleusercontent.com/fake=w544",sizes:"544x544"}]});document.title=songs[i].title+" - YouTube Music";}
+function go(d){i=(i+d+songs.length)%songs.length;v.src=songs[i].src;setMeta();v.play();}
+setMeta();
+setInterval(()=>log.textContent="t="+v.currentTime.toFixed(1)+" paused="+v.paused+" song="+songs[i].title,500);
+</script></body></html>

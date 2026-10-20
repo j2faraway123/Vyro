@@ -19,7 +19,7 @@ export function TopBar() {
   }, [searchFocusTick]);
 
   return (
-    <div className="sticky top-0 z-20 flex items-center gap-2 rounded-t-vy-lg bg-[color-mix(in_srgb,var(--vy-panel)_72%,transparent)] px-6 pt-4 pb-3 backdrop-blur-xl">
+    <div data-topbar className="sticky top-0 z-20 flex items-center gap-2 rounded-t-vy-lg bg-[color-mix(in_srgb,var(--vy-panel)_72%,transparent)] px-6 pt-4 pb-3 backdrop-blur-xl">
       {sidebar === "hidden" && (
         <IconButton label="Show sidebar" size="sm" onClick={() => update({ sidebar: "expanded" })}>
           <PanelLeftOpen size={18} />

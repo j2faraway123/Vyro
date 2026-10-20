@@ -1,6 +1,7 @@
-//! YouTube Music in a Vyro window.
+//! YouTube Music inside Vyro's main window.
 //!
-//! music.youtube.com runs in its own window, signed in with the user's own
+//! music.youtube.com runs in a child webview placed over Vyro's content area
+//! (the frontend reports where that area is), signed in with the user's own
 //! account, and plays through YouTube's own player. Vyro never touches the
 //! audio stream or sign-in. Vyro Shield filters this window only when the user
 //! turns on its YouTube Music option, and then only the way it filters web
@@ -16,8 +17,9 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::{Mutex, OnceLock};
 use tauri::webview::NewWindowResponse;
-use tauri::webview::PageLoadEvent;
-use tauri::{AppHandle, Emitter, Manager, WebviewUrl, WebviewWindowBuilder, WindowEvent};
+use tauri::webview::{PageLoadEvent, WebviewBuilder};
+use tauri::window::WindowBuilder;
+use tauri::{AppHandle, Emitter, LogicalPosition, LogicalSize, Manager, Rect, Webview, WebviewUrl, WindowEvent};
 
 pub const LABEL: &str = crate::shield::YTM_LABEL;
 const HOME: &str = "https://music.youtube.com/";
@@ -167,7 +169,7 @@ const BRIDGE_JS: &str = r#"
 })();
 "#;
 
-/// Debug builds can point the window at a local stand-in page for testing.
+/// Debug builds can point the webview at a local stand-in page for testing.
 fn home() -> String {
     #[cfg(debug_assertions)]
     if let Ok(u) = std::env::var("VYRO_YTM_URL") {
@@ -176,19 +178,64 @@ fn home() -> String {
     HOME.to_string()
 }
 
-pub fn open(app: &AppHandle, data_dir: &std::path::Path, shield: std::sync::Arc<crate::shield::Shield>) -> Result<(), String> {
-    if let Some(w) = app.get_webview_window(LABEL) {
-        let _ = w.unminimize();
-        let _ = w.show();
-        return w.set_focus().map_err(|e| e.to_string());
+/// Where the embedded page sits inside the main window, in CSS pixels.
+#[derive(Debug, Clone, Copy, Deserialize, PartialEq)]
+pub struct Bounds {
+    pub x: f64,
+    pub y: f64,
+    pub width: f64,
+    pub height: f64,
+}
+
+impl Bounds {
+    fn usable(self) -> Option<Self> {
+        let ok = [self.x, self.y, self.width, self.height].iter().all(|v| v.is_finite());
+        (ok && self.width >= 1.0 && self.height >= 1.0).then_some(self)
+    }
+}
+
+fn webview(app: &AppHandle) -> Option<Webview> {
+    app.get_webview(LABEL)
+}
+
+fn place(w: &Webview, b: Bounds) -> Result<(), String> {
+    w.set_bounds(Rect { position: LogicalPosition::new(b.x, b.y).into(), size: LogicalSize::new(b.width, b.height).into() })
+        .map_err(|e| e.to_string())?;
+    w.show().map_err(|e| e.to_string())
+}
+
+/// How YouTube Music is shown.
+#[derive(Debug, Clone, Copy, Serialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub enum Mode {
+    /// Inside Vyro's main window, over the content area.
+    Embedded,
+    /// In its own window. Used on Linux, where WebKitGTK child webviews are
+    /// stacked by GTK and can't be placed over part of the window.
+    Window,
+}
+
+pub const MODE: Mode = if cfg!(target_os = "linux") { Mode::Window } else { Mode::Embedded };
+
+/// Opens YouTube Music (inside Vyro's main window where supported), or brings it into view.
+pub fn open(app: &AppHandle, data_dir: &std::path::Path, shield: std::sync::Arc<crate::shield::Shield>, bounds: Bounds) -> Result<Mode, String> {
+    if let Some(w) = webview(app) {
+        match MODE {
+            Mode::Embedded => place(&w, bounds.usable().ok_or("There's no room to show YouTube Music")?)?,
+            Mode::Window => {
+                let win = w.window();
+                let _ = win.unminimize();
+                let _ = win.show();
+                let _ = win.set_focus();
+            }
+        }
+        return Ok(MODE);
     }
     let title_app = app.clone();
     let load_shield = shield.clone();
     let load_app = app.clone();
-    let window = WebviewWindowBuilder::new(app, LABEL, WebviewUrl::External(home().parse().map_err(|e| format!("Bad YouTube Music URL: {e}"))?))
-        .title("YouTube Music · Vyro")
-        .inner_size(1180.0, 820.0)
-        .min_inner_size(420.0, 360.0)
+    let url = home().parse().map_err(|e| format!("Bad YouTube Music URL: {e}"))?;
+    let builder = WebviewBuilder::new(LABEL, WebviewUrl::External(url))
         .data_directory(data_dir.join("web-profile"))
         .initialization_script(BRIDGE_JS)
         .on_navigation(|u| u.scheme() == "https" || u.scheme() == "about" || (cfg!(debug_assertions) && u.scheme() == "http"))
@@ -213,38 +260,88 @@ pub fn open(app: &AppHandle, data_dir: &std::path::Path, shield: std::sync::Arc<
         .on_document_title_changed(move |w, title| {
             if let Some(state) = parse_report(&title) {
                 let _ = title_app.emit_to("main", "ytm-state", Some(state));
-            } else if !title.is_empty() {
-                let _ = w.set_title(&format!("{title} · Vyro"));
+            } else if MODE == Mode::Window && !title.is_empty() {
+                let _ = w.window().set_title(&format!("{title} · Vyro"));
             }
-        })
-        .build()
-        .map_err(|e| format!("Could not open YouTube Music: {e}"))?;
+        });
+    let fail = |e: tauri::Error| format!("Could not open YouTube Music: {e}");
+    let webview = match MODE {
+        Mode::Embedded => {
+            let b = bounds.usable().ok_or("There's no room to show YouTube Music")?;
+            let main = app.get_window("main").ok_or("Vyro's main window is missing")?;
+            main.add_child(builder, LogicalPosition::new(b.x, b.y), LogicalSize::new(b.width, b.height)).map_err(fail)?
+        }
+        Mode::Window => {
+            let win = WindowBuilder::new(app, "ytm-window")
+                .title("YouTube Music · Vyro")
+                .inner_size(1180.0, 820.0)
+                .min_inner_size(420.0, 360.0)
+                .build()
+                .map_err(fail)?;
+            let close_app = app.clone();
+            win.on_window_event(move |e| {
+                if let WindowEvent::Destroyed = e {
+                    closed(&close_app);
+                }
+            });
+            win.add_child(builder.auto_resize(), LogicalPosition::new(0.0, 0.0), LogicalSize::new(1180.0, 820.0)).map_err(fail)?
+        }
+    };
 
     // Requests are checked against `Shield::applies_to` on every call, so the
     // hook can be attached up front and the YouTube Music option takes effect
-    // without reopening the window.
+    // without reloading the page.
     #[cfg(windows)]
-    crate::shield::windows::attach(&window, shield.clone())?;
+    crate::shield::windows::attach(&webview, shield.clone())?;
     #[cfg(target_os = "linux")]
-    crate::shield::linux::apply(&window, shield.clone())?;
+    crate::shield::linux::apply(&webview, shield.clone())?;
+    let _ = webview;
+    Ok(MODE)
+}
 
-    let close_app = app.clone();
-    window.on_window_event(move |e| {
-        if let WindowEvent::Destroyed = e {
-            let state = close_app.state::<crate::AppState>();
-            state.shield.window_closed(LABEL);
-            let _ = close_app.emit_to("main", "shield-stats", state.shield.state().windows);
-            let _ = close_app.emit_to("main", "ytm-state", None::<YtmState>);
+/// Moves the embedded page, or hides it (it keeps playing) when `bounds` is None.
+pub fn set_bounds(app: &AppHandle, bounds: Option<Bounds>) -> Result<(), String> {
+    if MODE == Mode::Window {
+        return Ok(());
+    }
+    let Some(w) = webview(app) else { return Ok(()) };
+    match bounds.and_then(Bounds::usable) {
+        Some(b) => place(&w, b),
+        None => w.hide().map_err(|e| e.to_string()),
+    }
+}
+
+pub fn reload(app: &AppHandle) -> Result<(), String> {
+    webview(app).ok_or("YouTube Music isn't open")?.reload().map_err(|e| e.to_string())
+}
+
+/// Closes YouTube Music, which stops its playback.
+pub fn close(app: &AppHandle) -> Result<(), String> {
+    let Some(w) = webview(app) else { return Ok(()) };
+    match MODE {
+        // Destroying the window reports the close through `closed`.
+        Mode::Window => w.window().close().map_err(|e| e.to_string()),
+        Mode::Embedded => {
+            w.close().map_err(|e| e.to_string())?;
+            closed(app);
+            Ok(())
         }
-    });
-    Ok(())
+    }
+}
+
+fn closed(app: &AppHandle) {
+    let state = app.state::<crate::AppState>();
+    state.shield.window_closed(LABEL);
+    let _ = app.emit_to("main", "shield-stats", state.shield.state().windows);
+    let _ = app.emit_to("main", "ytm-state", None::<YtmState>);
+    let _ = app.emit_to("main", "ytm-closed", ());
 }
 
 pub fn control(app: &AppHandle, action: &str, value: Option<f64>) -> Result<(), String> {
     if !matches!(action, "toggle" | "play" | "pause" | "next" | "prev" | "seek") {
         return Err(format!("Unknown action {action}"));
     }
-    let w = app.get_webview_window(LABEL).ok_or("YouTube Music isn't open")?;
+    let w = webview(app).ok_or("YouTube Music isn't open")?;
     let value = value.filter(|v| v.is_finite()).unwrap_or(0.0);
     w.eval(format!("window.__vyroYtm && window.__vyroYtm.control({action:?}, {value})"))
         .map_err(|e| e.to_string())

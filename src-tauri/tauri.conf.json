@@ -10,19 +10,7 @@
     "frontendDist": "../dist"
   },
   "app": {
-    "windows": [
-      {
-        "label": "main",
-        "title": "Vyro",
-        "width": 1440,
-        "height": 900,
-        "minWidth": 960,
-        "minHeight": 620,
-        "decorations": true,
-        "backgroundColor": "#171717",
-        "dragDropEnabled": true
-      }
-    ],
+    "windows": [],
     "security": {
       "csp": {
         "default-src": "'self'",

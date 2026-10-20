@@ -1,8 +1,8 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "Permissions for Vyro's main window only. Vyro web windows (labels web-*) get no capabilities, so remote pages cannot call into the app.",
-  "windows": ["main"],
+  "description": "Permissions for Vyro's main webview only. Vyro web windows (labels web-*) and the embedded YouTube Music webview (label ytm, inside the main window) get no capabilities, so remote pages cannot call into the app.",
+  "webviews": ["main"],
   "permissions": [
     "core:default",
     "core:window:allow-set-fullscreen",

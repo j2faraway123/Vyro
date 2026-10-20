@@ -85,7 +85,9 @@ export function createTauriBackend(): Backend {
     webOpen: (url) => invoke("web_open", { url }),
     webFocus: (label) => invoke("web_focus", { label }),
     webClose: (label) => invoke("web_close", { label }),
-    ytmOpen: () => invoke("ytm_open"),
+    ytmOpen: (bounds) => invoke("ytm_open", { bounds }),
+    ytmSetBounds: (bounds) => invoke("ytm_set_bounds", { bounds }),
+    ytmReload: () => invoke("ytm_reload"),
     ytmClose: () => invoke("ytm_close"),
     ytmControl: (action, value) => invoke("ytm_control", { action, value: value ?? null }),
     ytmPalette: (url) => invoke("ytm_palette", { url }),
@@ -103,6 +105,7 @@ export function createTauriBackend(): Backend {
         listen<ShieldState>("shield-changed", (e) => cb({ type: "shield-changed", payload: e.payload })),
         listen("shield-stats", (e) => cb({ type: "shield-stats", payload: e.payload } as BackendEvent)),
         listen<YtmState | null>("ytm-state", (e) => cb({ type: "ytm-state", payload: e.payload })),
+        listen("ytm-closed", () => cb({ type: "ytm-closed" })),
         getCurrentWebview().onDragDropEvent((e) => {
           if (e.payload.type === "drop") cb({ type: "files-dropped", payload: e.payload.paths });
         }),

@@ -295,16 +295,23 @@ fn lyrics_clear_cache(state: State<AppState>) -> CmdResult<()> {
 // ---------------------------------------------------------------- YouTube Music
 
 #[tauri::command]
-fn ytm_open(app: AppHandle, state: State<AppState>) -> CmdResult<()> {
-    ytm::open(&app, &state.data_dir, state.shield.clone())
+fn ytm_open(app: AppHandle, state: State<AppState>, bounds: ytm::Bounds) -> CmdResult<ytm::Mode> {
+    ytm::open(&app, &state.data_dir, state.shield.clone(), bounds)
+}
+
+#[tauri::command]
+fn ytm_set_bounds(app: AppHandle, bounds: Option<ytm::Bounds>) -> CmdResult<()> {
+    ytm::set_bounds(&app, bounds)
+}
+
+#[tauri::command]
+fn ytm_reload(app: AppHandle) -> CmdResult<()> {
+    ytm::reload(&app)
 }
 
 #[tauri::command]
 fn ytm_close(app: AppHandle) -> CmdResult<()> {
-    if let Some(w) = app.get_webview_window(ytm::LABEL) {
-        w.close().map_err(|e| e.to_string())?;
-    }
-    Ok(())
+    ytm::close(&app)
 }
 
 #[tauri::command]
@@ -347,9 +354,12 @@ fn refresh_web_windows(app: &AppHandle) {
     {
         let shield = app.state::<AppState>().shield.clone();
         for (label, w) in app.webview_windows() {
-            if label.starts_with("web-") || label == shield::YTM_LABEL {
-                let _ = shield::linux::apply(&w, shield.clone());
+            if label.starts_with("web-") {
+                let _ = shield::linux::apply(w.as_ref(), shield.clone());
             }
+        }
+        if let Some(w) = app.get_webview(shield::YTM_LABEL) {
+            let _ = shield::linux::apply(&w, shield.clone());
         }
     }
     let _ = app;
@@ -528,9 +538,9 @@ fn open_web_window(app: &AppHandle, url: url::Url) -> CmdResult<String> {
         .map_err(|e| format!("Could not open the web window: {e}"))?;
 
     #[cfg(windows)]
-    shield::windows::attach(&window, shield.clone())?;
+    shield::windows::attach(window.as_ref(), shield.clone())?;
     #[cfg(target_os = "linux")]
-    shield::linux::apply(&window, shield.clone())?;
+    shield::linux::apply(window.as_ref(), shield.clone())?;
 
     let close_label = label.clone();
     let close_app = app.clone();
@@ -591,6 +601,31 @@ fn app_info(state: State<AppState>) -> AppInfo {
     }
 }
 
+/// The main window is a plain window holding Vyro's own webview (label
+/// "main", filling the window), so YouTube Music can be added beside it as a
+/// child webview (see `ytm.rs`). A config-defined window can't host that on
+/// every platform.
+fn open_main_window(app: &AppHandle) -> tauri::Result<()> {
+    let bg = tauri::window::Color(0x17, 0x17, 0x17, 0xff);
+    let window = tauri::window::WindowBuilder::new(app, "main")
+        .title("Vyro")
+        .inner_size(1440.0, 900.0)
+        .min_inner_size(960.0, 620.0)
+        .background_color(bg)
+        .build()?;
+    let size = window.inner_size()?.to_logical::<f64>(window.scale_factor()?);
+    // Debug builds can start an automated YouTube Music check (see e2e/ytm-embed-check.ps1).
+    let page = if cfg!(debug_assertions) && std::env::var_os("VYRO_E2E_YTM").is_some() { "index.html#e2e-ytm" } else { "index.html" };
+    window.add_child(
+        tauri::webview::WebviewBuilder::new("main", WebviewUrl::App(page.into()))
+            .background_color(bg)
+            .auto_resize(),
+        tauri::LogicalPosition::new(0.0, 0.0),
+        size,
+    )?;
+    Ok(())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -633,6 +668,8 @@ pub fn run() {
                 shield: shield.clone(),
                 web_counter: AtomicU64::new(0),
             });
+
+            open_main_window(app.handle())?;
 
             // Build the filter engine in the background so startup stays fast.
             let handle = app.handle().clone();
@@ -690,6 +727,8 @@ pub fn run() {
             web_focus,
             web_close,
             ytm_open,
+            ytm_set_bounds,
+            ytm_reload,
             ytm_close,
             ytm_control,
             ytm_palette,

@@ -1,0 +1,35 @@
+name: YouTube Music embed check
+
+# Runs a debug build on Windows against a stand-in YouTube Music page and
+# uploads screenshots, so the embedded webview's placement can be checked on
+# the platform Vyro targets first.
+on:
+  push:
+    branches: [main, "ytm-*"]
+    paths: ["src/**", "src-tauri/**", "e2e/ytm-*", "e2e/ytm-standin/**", ".github/workflows/ytm-embed-check.yml"]
+  workflow_dispatch:
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+      - run: npm ci
+      - name: Debug build (frontend bundled)
+        run: npm run tauri build -- --debug --no-bundle
+      - name: Open YouTube Music in the app and take screenshots
+        shell: pwsh
+        run: ./e2e/ytm-embed-check.ps1 -Exe src-tauri\target\debug\vyro.exe -Out e2e\screenshots
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ytm-embed-screenshots
+          path: e2e/screenshots/*.png

@@ -12,7 +12,7 @@ use std::collections::hash_map::DefaultHasher;
 use std::ffi::{c_void, CString};
 use std::hash::{Hash, Hasher};
 use std::sync::Arc;
-use tauri::{Runtime, WebviewWindow};
+use tauri::{Runtime, Webview};
 use webkit2gtk::ffi as wk;
 use webkit2gtk::glib::translate::ToGlibPtr;
 use webkit2gtk::glib::{ffi as glib_ffi, gobject_ffi};
@@ -135,7 +135,7 @@ unsafe extern "C" fn on_ready(source: *mut gobject_ffi::GObject, res: *mut gio_f
 /// Attaches (or removes) the compiled filter on `window`. Compilation happens
 /// on first use and whenever the rule set changes; until it finishes the page
 /// loads unfiltered.
-pub fn apply<R: Runtime>(window: &WebviewWindow<R>, shield: Arc<Shield>) -> Result<(), String> {
+pub fn apply<R: Runtime>(window: &Webview<R>, shield: Arc<Shield>) -> Result<(), String> {
     let json = if shield.applies_to(window.label()) { content_rules_json(&shield) } else { None };
     let store_dir = shield.dir().join("webkit");
     window

@@ -19,7 +19,7 @@ import { Library } from "./pages/Library";
 import { Search } from "./pages/Search";
 import { SettingsPage } from "./pages/settings/SettingsPage";
 import { WebPage } from "./pages/Web";
-import { YouTubeMusicPage } from "./pages/YouTubeMusic";
+import { YouTubeMusicPage, e2eYtm, useYtmEmbed } from "./pages/YouTubeMusic";
 import { useLibrary } from "./store/library";
 import { usePlayer } from "./store/player";
 import { useActiveTheme, useSettings } from "./store/settings";
@@ -32,6 +32,7 @@ async function boot(b: Backend) {
   useSettings.getState().init(settings.app, themes);
   await useLibrary.getState().refresh();
   usePlayer.getState().restore(settings.queue);
+  if (e2eYtm) useUi.getState().navigate({ name: "ytm" });
   useShield.getState().load();
   b.scanStatus().then((s) => s.running && useLibrary.getState().setScan(s));
   let refreshTimer: ReturnType<typeof setTimeout> | null = null;
@@ -64,6 +65,9 @@ async function boot(b: Backend) {
         break;
       case "ytm-state":
         usePlayer.getState().setYtm(e.payload);
+        break;
+      case "ytm-closed":
+        useYtmEmbed.getState().setMode(null);
         break;
       case "files-dropped":
         useLibrary.getState().importDropped(e.payload);
