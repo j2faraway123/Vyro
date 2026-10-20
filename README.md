@@ -6,7 +6,8 @@ album-reactive animated backgrounds, synced lyrics, a JSON theme engine and
 open from inside the app.
 
 It is a standalone app built with Tauri 2, React and TypeScript. It is not a
-client, mod or skin for any streaming service.
+client, mod or skin for any streaming service. It can also show and control
+YouTube Music, which you sign in to in its own Vyro window (see below).
 
 ![Vyro playing an album on Linux](docs/screenshots/linux-album-playing.png)
 
@@ -24,9 +25,38 @@ More screenshots of the real app on Linux are in [docs/screenshots](docs/screens
 | Dynamic backgrounds | Done. Colours extracted from the artwork, smooth crossfades between songs, animated colour fields, blurred art, light waves, particles and parallax. Presets Aurora, Sunset, Ocean, Midnight and Ambient; static colour, custom gradient or your own image. Reduced-motion and performance modes. |
 | Themes | Done. Dark, light and more built in. Accent, corner radius, density, sidebar and panel layout; JSON import and export ([format](docs/THEMES.md)). |
 | Vyro Shield | Done on **Windows** and **Linux**; element hiding only on macOS. See [docs/SHIELD.md](docs/SHIELD.md) for exactly what it does and doesn't do. |
-| Streaming-service integrations | Not included. Vyro plays local files. |
+| YouTube Music tab | New in 0.2.0. YouTube Music runs in its own Vyro window with your account; Vyro shows the song with its artwork colours, lyrics from LRCLIB and its own play, pause, skip and seek controls. See *YouTube Music* below. Tested on Linux against a stand-in page only; the real site was not reachable from the build machine. |
+| Other streaming services | Not included. |
 | Gapless playback and crossfade | Not implemented. |
 | macOS | Should build, but has not been tested. |
+
+## YouTube Music
+
+Open **YouTube Music** in the sidebar and press *Open YouTube Music*. A
+separate window loads music.youtube.com, where you sign in and play as usual.
+While it plays, Vyro's playback bar, now-playing panel, background and lyrics
+follow it, and Vyro's buttons control it. Playing a local track pauses YouTube
+Music, and starting a song in YouTube Music pauses the local track.
+
+What it does not do:
+
+- **It doesn't block YouTube's ads.** Vyro Shield is not attached to the
+  YouTube Music window. YouTube's ads are part of its stream, and Vyro
+  doesn't interfere with streams, subscriptions or sign-in. YouTube Music
+  Premium removes them.
+- It doesn't download, save or record anything, and YouTube songs don't enter
+  your local library, favorites or history.
+- The queue, likes and playlists stay in YouTube Music.
+- Google sometimes refuses sign-in inside embedded browsers. YouTube Music
+  still plays signed out if that happens.
+
+How it works: the window has no access to Vyro's internal commands. A small
+script reads the page's Media Session metadata (the same information the
+browser shows in the system media overlay) and reports it to Vyro, and
+Vyro's controls press YouTube Music's own buttons. Artwork colours are only
+fetched from Google's image hosts. If YouTube changes its page, the controls
+may stop working until Vyro is updated; playback in the window itself is
+unaffected.
 
 ## Requirements
 
@@ -112,9 +142,9 @@ npm run tauri build -- --bundles nsis,msi
 
 Output:
 
-- `src-tauri\target\release\bundle\nsis\Vyro_0.1.0_x64-setup.exe`, a
+- `src-tauri\target\release\bundle\nsis\Vyro_0.2.0_x64-setup.exe`, a
   per-user installer that needs no admin rights;
-- `src-tauri\target\release\bundle\msi\Vyro_0.1.0_x64_en-US.msi`.
+- `src-tauri\target\release\bundle\msi\Vyro_0.2.0_x64_en-US.msi`.
 
 Or let GitHub build it: [`.github/workflows/build.yml`](.github/workflows/build.yml)
 runs the tests on Linux and builds both installers on `windows-latest` for
@@ -170,7 +200,7 @@ Everything is local, in the app data folder:
 | `artwork/` | Resized cover art and extracted palettes |
 | `backgrounds/` | Images you import as a custom background |
 | `shield/` | Downloaded filter lists |
-| `web-profile/` | Browser profile for Vyro web windows (cookies, site data) |
+| `web-profile/` | Browser profile for Vyro web windows and YouTube Music (cookies, site data) |
 
 Deleting the folder resets Vyro. Your music files are only ever read, never
 modified or moved.
@@ -197,13 +227,14 @@ src/                  React + TypeScript UI
   audio/              playback engine (HTMLAudioElement)
   components/         layout, background, lyrics, queue, shared controls
   lib/                pure logic: LRC parsing, colours, themes, queue, library, settings
-  pages/              Discover, Search, Library, Favorites, Playlists, Recent, Web, Settings
+  pages/              Discover, Search, Library, Favorites, Playlists, Recent, YouTube Music, Web, Settings
   store/              zustand stores (player, library, settings, ui, shield)
 src-tauri/src/
   db.rs               SQLite schema and queries
   scanner.rs          folder scan, tags, artwork cache
   palette.rs          artwork colour extraction
   lyrics.rs           sidecar, tag and LRCLIB lyrics
+  ytm.rs              YouTube Music window and now-playing bridge
   shield/             Vyro Shield: engine, lists, Windows (WebView2) and Linux (WebKitGTK) hooks
   lib.rs              Tauri commands, events, windows
 docs/                 theme format, Shield details, example theme

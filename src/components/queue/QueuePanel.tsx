@@ -23,6 +23,15 @@ export function QueuePanel() {
   const current = queue[index];
   const upcoming = queue.slice(index + 1);
   const from = contextLabel(context, lib);
+  const ytm = usePlayer((s) => s.source === "ytm");
+
+  if (ytm)
+    return (
+      <div className="flex h-full flex-col items-center justify-center px-6 text-center">
+        <p className="font-semibold text-fg">Playing from YouTube Music</p>
+        <p className="mt-1 text-xs text-fg-2">Its queue is managed in the YouTube Music window. Play a local track to switch back to your library queue.</p>
+      </div>
+    );
 
   if (!queue.length)
     return (

@@ -10,6 +10,7 @@ import type {
   ShieldState,
   Track,
   WebWindowStats,
+  YtmState,
 } from "./types";
 
 export type BackendEvent =
@@ -17,7 +18,8 @@ export type BackendEvent =
   | { type: "library-changed"; payload: unknown }
   | { type: "shield-changed"; payload: ShieldState }
   | { type: "shield-stats"; payload: WebWindowStats[] }
-  | { type: "files-dropped"; payload: string[] };
+  | { type: "files-dropped"; payload: string[] }
+  | { type: "ytm-state"; payload: YtmState | null };
 
 export interface Backend {
   /** True in the browser preview (no desktop runtime): demo data only. */
@@ -73,6 +75,11 @@ export interface Backend {
   webOpen(url: string): Promise<string>;
   webFocus(label: string): Promise<void>;
   webClose(label: string): Promise<void>;
+  ytmOpen(): Promise<void>;
+  ytmClose(): Promise<void>;
+  ytmControl(action: "toggle" | "play" | "pause" | "next" | "prev" | "seek", value?: number): Promise<void>;
+  ytmPalette(artworkUrl: string): Promise<string[]>;
+  lyricsLookup(title: string, artist: string, album: string, duration: number): Promise<Lyrics>;
 
   appInfo(): Promise<AppInfo>;
   mediaUrl(track: Track): string;

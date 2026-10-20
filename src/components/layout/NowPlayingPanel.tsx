@@ -114,12 +114,12 @@ export function NowPlayingPanel() {
         <div className="min-w-0 flex-1">
           {track ? (
             <>
-              <button type="button" onClick={() => navigate({ name: "album", key: albumKey(track) })} className="block max-w-full truncate text-left text-lg leading-tight font-extrabold text-fg hover:underline">
+              <button type="button" onClick={() => navigate(track.id < 0 ? { name: "ytm" } : { name: "album", key: albumKey(track) })} className="block max-w-full truncate text-left text-lg leading-tight font-extrabold text-fg hover:underline">
                 {track.title}
               </button>
               <button
                 type="button"
-                onClick={() => navigate({ name: "artist", artist: track.albumArtist })}
+                onClick={() => navigate(track.id < 0 ? { name: "ytm" } : { name: "artist", artist: track.albumArtist })}
                 className="block max-w-full truncate text-left text-sm text-fg-2 hover:text-fg hover:underline"
               >
                 {track.artist}
@@ -129,7 +129,7 @@ export function NowPlayingPanel() {
             <p className="text-sm text-fg-3">Nothing playing</p>
           )}
         </div>
-        {track && (
+        {track && track.id >= 0 && (
           <IconButton label={fav ? "Remove from favorites" : "Add to favorites"} active={fav} onClick={() => toggleFavorite(track.id)}>
             <Heart size={19} fill={fav ? "currentColor" : "none"} />
           </IconButton>

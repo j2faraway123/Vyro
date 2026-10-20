@@ -11,6 +11,7 @@ export type Route =
   | { name: "playlist"; id: number }
   | { name: "recent" }
   | { name: "web" }
+  | { name: "ytm" }
   | { name: "settings"; section?: SettingsSection };
 
 export type SettingsSection = "appearance" | "background" | "shield" | "playback" | "lyrics" | "library" | "shortcuts" | "about";

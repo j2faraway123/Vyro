@@ -4,7 +4,7 @@ import { getCurrentWebview } from "@tauri-apps/api/webview";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { open, save } from "@tauri-apps/plugin-dialog";
 import type { Backend, BackendEvent } from "./backend";
-import type { ShieldState } from "./types";
+import type { ShieldState, YtmState } from "./types";
 
 const AUDIO_EXT = ["mp3", "flac", "wav", "m4a", "aac", "ogg", "oga", "opus"];
 
@@ -85,6 +85,11 @@ export function createTauriBackend(): Backend {
     webOpen: (url) => invoke("web_open", { url }),
     webFocus: (label) => invoke("web_focus", { label }),
     webClose: (label) => invoke("web_close", { label }),
+    ytmOpen: () => invoke("ytm_open"),
+    ytmClose: () => invoke("ytm_close"),
+    ytmControl: (action, value) => invoke("ytm_control", { action, value: value ?? null }),
+    ytmPalette: (url) => invoke("ytm_palette", { url }),
+    lyricsLookup: (title, artist, album, duration) => invoke("lyrics_lookup", { title, artist, album, duration }),
 
     appInfo: () => invoke("app_info"),
     mediaUrl: (track) => convertFileSrc(track.path),
@@ -97,6 +102,7 @@ export function createTauriBackend(): Backend {
         listen("library-changed", (e) => cb({ type: "library-changed", payload: e.payload })),
         listen<ShieldState>("shield-changed", (e) => cb({ type: "shield-changed", payload: e.payload })),
         listen("shield-stats", (e) => cb({ type: "shield-stats", payload: e.payload } as BackendEvent)),
+        listen<YtmState | null>("ytm-state", (e) => cb({ type: "ytm-state", payload: e.payload })),
         getCurrentWebview().onDragDropEvent((e) => {
           if (e.payload.type === "drop") cb({ type: "files-dropped", payload: e.payload.paths });
         }),

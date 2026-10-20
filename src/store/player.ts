@@ -2,12 +2,29 @@ import { create } from "zustand";
 import { engine } from "../audio/engine";
 import { backend } from "../lib/backend";
 import { indexAfterMove, moveItem, nextIndex, prevIndex, shuffleAround } from "../lib/queue";
-import type { RepeatMode, Track } from "../lib/types";
+import type { RepeatMode, Track, YtmState } from "../lib/types";
 import { useLibrary } from "./library";
 import { useSettings } from "./settings";
 import { toast } from "./ui";
 
+/** "ytm": YouTube Music (in its Vyro window) is the active player. */
+export type PlaybackSource = "local" | "ytm";
+
+/** Id used for the synthesized track that stands for YouTube Music's song. */
+export const YTM_TRACK_ID = -1;
+
+interface YtmLive extends YtmState {
+  /** performance.now() when this report arrived, to extrapolate position. */
+  at: number;
+}
+
 interface PlayerState {
+  source: PlaybackSource;
+  ytm: YtmLive | null;
+  ytmTrack: Track | null;
+  setYtm: (s: YtmState | null) => void;
+  /** Switches back from YouTube Music and resumes the local queue. */
+  playLocal: () => void;
   queue: number[];
   /** The queue in its original (unshuffled) order. */
   original: number[];
@@ -53,6 +70,46 @@ function trackById(id: number | undefined): Track | null {
   return id === undefined ? null : (useLibrary.getState().byId.get(id) ?? null);
 }
 
+function ytmTrackFor(y: YtmState, palette: string[] | null): Track {
+  return {
+    id: YTM_TRACK_ID,
+    path: "youtube-music:",
+    title: y.title || "YouTube Music",
+    artist: y.artist || "",
+    album: y.album || "",
+    albumArtist: y.artist || "",
+    trackNo: null,
+    discNo: null,
+    year: null,
+    genre: null,
+    duration: y.duration,
+    format: "YouTube Music",
+    bitrate: null,
+    sampleRate: null,
+    artwork: y.artwork,
+    palette,
+    fileSize: 0,
+    mtime: 0,
+    addedAt: 0,
+    playCount: 0,
+    lastPlayed: null,
+  };
+}
+
+const ytmKey = (y: YtmState) => [y.title, y.artist, y.album, y.artwork, Math.round(y.duration)].join("\u0000");
+let ytmTicker: ReturnType<typeof setInterval> | null = null;
+const ytmPalettes = new Map<string, string[]>();
+
+/** Current playback time in seconds for whichever source is active. */
+export function playerTime(): number {
+  const { source, ytm } = usePlayer.getState();
+  if (source === "ytm" && ytm) {
+    const t = ytm.playing ? ytm.position + (performance.now() - ytm.at) / 1000 : ytm.position;
+    return ytm.duration > 0 ? Math.min(t, ytm.duration) : t;
+  }
+  return engine.time;
+}
+
 let queueSaveTimer: ReturnType<typeof setTimeout> | null = null;
 function saveQueue() {
   if (queueSaveTimer) clearTimeout(queueSaveTimer);
@@ -75,7 +132,23 @@ function persistPlayback(patch: Partial<{ volume: number; muted: boolean; shuffl
 }
 
 export const usePlayer = create<PlayerState>((set, get) => {
+  const ytm = (action: "toggle" | "play" | "pause" | "next" | "prev" | "seek", value?: number) =>
+    backend()
+      .ytmControl(action, value)
+      .catch((e) => toast(`YouTube Music: ${e}`, "error"));
+  const isYtm = () => get().source === "ytm";
+  /** Hands playback back to the local engine (YouTube Music is paused). */
+  const takeOver = () => {
+    if (!isYtm()) return;
+    if (get().ytm?.playing) void ytm("pause");
+    if (ytmTicker) clearInterval(ytmTicker);
+    ytmTicker = null;
+    const local = trackById(get().queue[get().index]);
+    set({ source: "local", playing: false, position: engine.time, duration: engine.duration || local?.duration || 0 });
+  };
+
   const load = (index: number, autoplay: boolean, startAt = 0) => {
+    takeOver();
     const { queue } = get();
     const track = trackById(queue[index]);
     if (!track) {
@@ -93,15 +166,17 @@ export const usePlayer = create<PlayerState>((set, get) => {
   };
 
   // Wire engine events once.
-  engine.on("play", () => set({ playing: true }));
-  engine.on("pause", () => set({ playing: false }));
+  engine.on("play", () => !isYtm() && set({ playing: true }));
+  engine.on("pause", () => !isYtm() && set({ playing: false }));
   engine.on("canplay", () => {
+    if (isYtm()) return;
     consecutiveErrors = 0;
     set({ loading: false });
   });
-  engine.on("loading", () => set({ loading: true }));
-  engine.on("duration", () => set({ duration: engine.duration || get().duration }));
+  engine.on("loading", () => !isYtm() && set({ loading: true }));
+  engine.on("duration", () => !isYtm() && set({ duration: engine.duration || get().duration }));
   engine.on("time", () => {
+    if (isYtm()) return;
     const t = engine.time;
     set({ position: t });
     const cur = get().current();
@@ -110,7 +185,7 @@ export const usePlayer = create<PlayerState>((set, get) => {
       useLibrary.getState().recordPlay(cur.id);
     }
   });
-  engine.on("ended", () => get().next(true));
+  engine.on("ended", () => !isYtm() && get().next(true));
   engine.on("error", (msg) => {
     const cur = get().current();
     if (!cur) return;
@@ -123,7 +198,53 @@ export const usePlayer = create<PlayerState>((set, get) => {
     }
   });
 
+  const applyYtm = (y: YtmLive) => {
+    set({ playing: y.playing, position: y.position, duration: y.duration || get().duration, loading: false, error: null });
+    if (ytmTicker) clearInterval(ytmTicker);
+    ytmTicker = y.playing ? setInterval(() => isYtm() && set({ position: playerTime() }), 250) : null;
+  };
+
   return {
+    source: "local",
+    ytm: null,
+    ytmTrack: null,
+    playLocal: () => {
+      takeOver();
+      get().play();
+    },
+    setYtm: (s) => {
+      if (!s || !s.active) {
+        if (ytmTicker) clearInterval(ytmTicker);
+        ytmTicker = null;
+        const wasYtm = isYtm();
+        set({ ytm: null, ytmTrack: null, ...(wasYtm ? { source: "local" as const, playing: false, position: engine.time, duration: engine.duration || get().current()?.duration || 0 } : {}) });
+        return;
+      }
+      const live: YtmLive = { ...s, at: performance.now() };
+      const prev = get().ytm;
+      if (!prev || ytmKey(prev) !== ytmKey(s) || !get().ytmTrack) {
+        const known = s.artwork ? (ytmPalettes.get(s.artwork) ?? null) : null;
+        set({ ytmTrack: ytmTrackFor(s, known) });
+        const art = s.artwork;
+        if (art && !known) {
+          backend()
+            .ytmPalette(art)
+            .then((p) => {
+              ytmPalettes.set(art, p);
+              const cur = get().ytm;
+              if (cur && cur.artwork === art) set({ ytmTrack: ytmTrackFor(cur, p) });
+            })
+            .catch(() => {});
+        }
+      }
+      set({ ytm: live });
+      if (!isYtm() && (s.playing || get().index < 0)) {
+        // YouTube Music started playing (or nothing local is loaded): it becomes the active player.
+        engine.pause();
+        set({ source: "ytm" });
+      }
+      if (isYtm()) applyYtm(live);
+    },
     queue: [],
     original: [],
     index: -1,
@@ -138,7 +259,7 @@ export const usePlayer = create<PlayerState>((set, get) => {
     repeat: "off",
     error: null,
 
-    current: () => trackById(get().queue[get().index]),
+    current: () => (isYtm() ? get().ytmTrack : trackById(get().queue[get().index])),
 
     playTracks: (ids, start = 0, context) => {
       if (!ids.length) return;
@@ -154,18 +275,21 @@ export const usePlayer = create<PlayerState>((set, get) => {
       load(index, true);
     },
     toggle: () => {
+      if (isYtm()) return void ytm("toggle");
       const { index, queue } = get();
       if (index < 0 && queue.length) return load(0, true);
       if (engine.paused) get().play();
       else get().pause();
     },
     play: () => {
+      if (isYtm()) return void ytm("play");
       if (get().index < 0) return;
       if (!engine.el.src) return load(get().index, true, get().position);
       engine.play().catch((e) => toast(`Couldn't start playback: ${e}`, "error"));
     },
-    pause: () => engine.pause(),
+    pause: () => (isYtm() ? void ytm("pause") : engine.pause()),
     next: (auto = false) => {
+      if (isYtm()) return void ytm("next");
       const { index, queue, repeat } = get();
       const n = nextIndex(index, queue.length, repeat, auto);
       if (n === null) {
@@ -183,6 +307,7 @@ export const usePlayer = create<PlayerState>((set, get) => {
       load(n, true);
     },
     prev: () => {
+      if (isYtm()) return void ytm("prev");
       const { index, queue, repeat } = get();
       if (engine.time > 3) {
         engine.seek(0);
@@ -192,10 +317,15 @@ export const usePlayer = create<PlayerState>((set, get) => {
       if (p !== null) load(p, true);
     },
     seek: (t) => {
+      if (isYtm()) {
+        const y = get().ytm;
+        if (y) set({ ytm: { ...y, position: t, at: performance.now() }, position: t });
+        return void ytm("seek", t);
+      }
       engine.seek(t);
       set({ position: t });
     },
-    seekBy: (dt) => get().seek(Math.max(0, engine.time + dt)),
+    seekBy: (dt) => get().seek(Math.max(0, playerTime() + dt)),
     setVolume: (v) => {
       const volume = Math.max(0, Math.min(1, v));
       engine.setVolume(volume, false);
@@ -297,6 +427,8 @@ export const usePlayer = create<PlayerState>((set, get) => {
 
 export function useCurrentTrack(): Track | null {
   const id = usePlayer((s) => s.queue[s.index]);
+  const ytmTrack = usePlayer((s) => (s.source === "ytm" ? s.ytmTrack : null));
   const byId = useLibrary((s) => s.byId);
+  if (ytmTrack) return ytmTrack;
   return id === undefined ? null : (byId.get(id) ?? null);
 }

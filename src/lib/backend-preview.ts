@@ -300,6 +300,11 @@ export function createPreviewBackend(): Backend {
     webOpen: desktopOnly,
     webFocus: desktopOnly,
     webClose: desktopOnly,
+    ytmOpen: desktopOnly,
+    ytmClose: desktopOnly,
+    ytmControl: desktopOnly,
+    ytmPalette: desktopOnly,
+    lyricsLookup: desktopOnly,
 
     appInfo: async () => ({ version: "0.1.0", dataDir: "(browser preview)", platform: "browser", formats: ["wav"] }),
     mediaUrl: (t) => {

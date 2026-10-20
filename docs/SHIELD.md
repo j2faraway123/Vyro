@@ -20,6 +20,9 @@ It never filters:
 - sign-in, DRM, licence or subscription checks. Shield does not rewrite,
   replay or alter any request. It can only let a request through or refuse it.
 
+Shield is **not attached to the YouTube Music window**. Ads there play as
+they do on the website; YouTube Music Premium removes them.
+
 It does not promise ad-free playback on third-party streaming services. Ads
 that a service plays inside its own audio or video stream are part of that
 stream and are deliberately left alone. Vyro does not circumvent any

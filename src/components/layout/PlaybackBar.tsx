@@ -30,7 +30,7 @@ function Progress() {
   const position = usePlayer((s) => s.position);
   const duration = usePlayer((s) => s.duration);
   const seek = usePlayer((s) => s.seek);
-  const hasTrack = usePlayer((s) => s.index >= 0);
+  const hasTrack = usePlayer((s) => s.index >= 0 || s.source === "ytm");
   const [drag, setDrag] = useState<number | null>(null);
   const shown = drag ?? position;
   return (
@@ -65,6 +65,8 @@ export function PlaybackBar() {
   const { rightPanel, rightTab } = useSettings((s) => s.settings);
   const update = useSettings((s) => s.update);
   const fav = track ? favorites.has(track.id) : false;
+  // Shuffle and repeat belong to the local queue; YouTube Music has its own.
+  const ytm = p.source === "ytm";
   const VolIcon = p.muted || p.volume === 0 ? VolumeX : p.volume < 0.33 ? Volume : p.volume < 0.7 ? Volume1 : Volume2;
   const openTab = (tab: "lyrics" | "queue") => update(rightPanel && rightTab === tab ? { rightPanel: false } : { rightPanel: true, rightTab: tab });
 
@@ -74,22 +76,24 @@ export function PlaybackBar() {
       <div className="flex min-w-0 items-center gap-3">
         {track ? (
           <>
-            <button type="button" onClick={() => navigate({ name: "album", key: albumKey(track) })} aria-label={`Go to ${track.album}`} className="shrink-0">
+            <button type="button" onClick={() => navigate(track.id < 0 ? { name: "ytm" } : { name: "album", key: albumKey(track) })} aria-label={`Go to ${track.album || track.title}`} className="shrink-0">
               <Artwork src={track.artwork} className="h-14 w-14 shadow-lg" iconSize={20} />
             </button>
             <div className="min-w-0">
               <div className="truncate text-sm font-bold text-fg">{track.title}</div>
               <button
                 type="button"
-                onClick={() => navigate({ name: "artist", artist: track.albumArtist })}
+                onClick={() => navigate(track.id < 0 ? { name: "ytm" } : { name: "artist", artist: track.albumArtist })}
                 className="block max-w-full truncate text-left text-xs text-fg-2 hover:text-fg hover:underline"
               >
                 {track.artist}
               </button>
             </div>
-            <IconButton label={fav ? "Remove from favorites" : "Add to favorites"} active={fav} size="sm" onClick={() => toggleFavorite(track.id)}>
-              <Heart size={17} fill={fav ? "currentColor" : "none"} />
-            </IconButton>
+            {track.id >= 0 && (
+              <IconButton label={fav ? "Remove from favorites" : "Add to favorites"} active={fav} size="sm" onClick={() => toggleFavorite(track.id)}>
+                <Heart size={17} fill={fav ? "currentColor" : "none"} />
+              </IconButton>
+            )}
           </>
         ) : (
           <div className="text-sm text-fg-3">Nothing playing</div>
@@ -99,17 +103,17 @@ export function PlaybackBar() {
       {/* Transport */}
       <div className="flex min-w-0 flex-col items-center gap-1">
         <div className="flex items-center gap-2">
-          <IconButton label={p.shuffle ? "Shuffle on" : "Shuffle off"} active={p.shuffle} size="sm" onClick={p.toggleShuffle}>
+          <IconButton label={p.shuffle ? "Shuffle on" : "Shuffle off"} active={p.shuffle && !ytm} size="sm" onClick={p.toggleShuffle} disabled={ytm}>
             <Shuffle size={17} />
           </IconButton>
-          <IconButton label="Previous" onClick={p.prev} disabled={p.index < 0}>
+          <IconButton label="Previous" onClick={p.prev} disabled={p.index < 0 && !ytm}>
             <SkipBack size={19} fill="currentColor" />
           </IconButton>
           <button
             type="button"
             aria-label={p.playing ? "Pause" : "Play"}
             onClick={p.toggle}
-            disabled={!p.queue.length}
+            disabled={!p.queue.length && !ytm}
             className="flex h-10 w-10 items-center justify-center rounded-full bg-fg text-bg shadow-md transition-transform duration-150 hover:scale-105 active:scale-95 disabled:opacity-40"
           >
             {p.loading && p.playing ? (
@@ -120,14 +124,15 @@ export function PlaybackBar() {
               <Play size={18} fill="currentColor" className="ml-0.5" />
             )}
           </button>
-          <IconButton label="Next" onClick={() => p.next()} disabled={p.index < 0}>
+          <IconButton label="Next" onClick={() => p.next()} disabled={p.index < 0 && !ytm}>
             <SkipForward size={19} fill="currentColor" />
           </IconButton>
           <IconButton
             label={p.repeat === "off" ? "Repeat off" : p.repeat === "all" ? "Repeat all" : "Repeat one"}
-            active={p.repeat !== "off"}
+            active={p.repeat !== "off" && !ytm}
             size="sm"
             onClick={p.cycleRepeat}
+            disabled={ytm}
           >
             {p.repeat === "one" ? <Repeat1 size={17} /> : <Repeat size={17} />}
           </IconButton>

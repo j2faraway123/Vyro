@@ -4,6 +4,7 @@ mod lyrics;
 mod palette;
 mod scanner;
 mod shield;
+mod ytm;
 
 use serde::Serialize;
 use std::collections::HashMap;
@@ -289,6 +290,38 @@ async fn lyrics_get(app: AppHandle, track_id: i64, allow_online: bool, refresh: 
 #[tauri::command]
 fn lyrics_clear_cache(state: State<AppState>) -> CmdResult<()> {
     db::clear_lyrics_cache(&*state.conn()?)
+}
+
+// ---------------------------------------------------------------- YouTube Music
+
+#[tauri::command]
+fn ytm_open(app: AppHandle, state: State<AppState>) -> CmdResult<()> {
+    ytm::open(&app, &state.data_dir)
+}
+
+#[tauri::command]
+fn ytm_close(app: AppHandle) -> CmdResult<()> {
+    if let Some(w) = app.get_webview_window(ytm::LABEL) {
+        w.close().map_err(|e| e.to_string())?;
+    }
+    Ok(())
+}
+
+#[tauri::command]
+fn ytm_control(app: AppHandle, action: String, value: Option<f64>) -> CmdResult<()> {
+    ytm::control(&app, &action, value)
+}
+
+#[tauri::command]
+async fn ytm_palette(url: String) -> CmdResult<Vec<String>> {
+    tauri::async_runtime::spawn_blocking(move || ytm::artwork_palette(&url)).await.map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
+async fn lyrics_lookup(title: String, artist: String, album: String, duration: f64) -> CmdResult<lyrics::Lyrics> {
+    tauri::async_runtime::spawn_blocking(move || lyrics::lookup(&title, &artist, &album, duration))
+        .await
+        .map_err(|e| e.to_string())?
 }
 
 // ---------------------------------------------------------------- Vyro Shield
@@ -655,6 +688,11 @@ pub fn run() {
             web_open,
             web_focus,
             web_close,
+            ytm_open,
+            ytm_close,
+            ytm_control,
+            ytm_palette,
+            lyrics_lookup,
             app_info,
         ])
         .run(tauri::generate_context!())

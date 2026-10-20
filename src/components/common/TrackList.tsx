@@ -37,7 +37,7 @@ export function TrackList({ tracks, context, showAlbum = true, showArt = true, s
   const favorites = useLibrary((s) => s.favorites);
   const toggleFavorite = useLibrary((s) => s.toggleFavorite);
   const currentId = usePlayer((s) => s.queue[s.index]);
-  const playing = usePlayer((s) => s.playing);
+  const playing = usePlayer((s) => s.playing && s.source === "local");
   const playTracks = usePlayer((s) => s.playTracks);
   const openMenu = useUi((s) => s.openTrackMenu);
   const navigate = useUi((s) => s.navigate);

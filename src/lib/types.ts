@@ -1,3 +1,15 @@
+/** What YouTube Music (in its Vyro window) reports it is playing. */
+export interface YtmState {
+  active: boolean;
+  title: string;
+  artist: string;
+  album: string;
+  artwork: string | null;
+  playing: boolean;
+  position: number;
+  duration: number;
+}
+
 export interface Track {
   id: number;
   path: string;

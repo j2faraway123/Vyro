@@ -5,7 +5,8 @@ import { usePlayer, useCurrentTrack } from "../store/player";
 /**
  * Publishes now-playing metadata to the OS media controls (on Windows,
  * WebView2 forwards the Media Session API to the system media overlay and
- * hardware media keys).
+ * hardware media keys). While YouTube Music plays, its own window publishes
+ * the session, so this window steps aside to avoid a duplicate entry.
  */
 export function useMediaSession() {
   const track = useCurrentTrack();
@@ -14,7 +15,7 @@ export function useMediaSession() {
   useEffect(() => {
     if (!("mediaSession" in navigator)) return;
     const ms = navigator.mediaSession;
-    if (!track) {
+    if (!track || track.id < 0) {
       ms.metadata = null;
       return;
     }
@@ -29,8 +30,8 @@ export function useMediaSession() {
 
   useEffect(() => {
     if (!("mediaSession" in navigator)) return;
-    navigator.mediaSession.playbackState = playing ? "playing" : "paused";
-  }, [playing]);
+    navigator.mediaSession.playbackState = track && track.id < 0 ? "none" : playing ? "playing" : "paused";
+  }, [playing, track]);
 
   useEffect(() => {
     if (!("mediaSession" in navigator)) return;

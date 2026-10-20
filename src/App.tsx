@@ -19,6 +19,7 @@ import { Library } from "./pages/Library";
 import { Search } from "./pages/Search";
 import { SettingsPage } from "./pages/settings/SettingsPage";
 import { WebPage } from "./pages/Web";
+import { YouTubeMusicPage } from "./pages/YouTubeMusic";
 import { useLibrary } from "./store/library";
 import { usePlayer } from "./store/player";
 import { useActiveTheme, useSettings } from "./store/settings";
@@ -61,6 +62,9 @@ async function boot(b: Backend) {
       case "shield-stats":
         useShield.getState().setWindows(e.payload);
         break;
+      case "ytm-state":
+        usePlayer.getState().setYtm(e.payload);
+        break;
       case "files-dropped":
         useLibrary.getState().importDropped(e.payload);
         break;
@@ -99,6 +103,8 @@ function Page() {
       return <RecentPage />;
     case "web":
       return <WebPage />;
+    case "ytm":
+      return <YouTubeMusicPage />;
     case "settings":
       return <SettingsPage section={route.section} />;
   }

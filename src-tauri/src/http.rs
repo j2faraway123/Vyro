@@ -38,6 +38,14 @@ pub fn get_text(url: &str, query: &[(&str, &str)], limit: u64) -> Result<(u16, S
     Ok((status, body))
 }
 
+/// GET returning (status, bytes). Bodies are capped at `limit` bytes.
+pub fn get_bytes(url: &str, limit: u64) -> Result<(u16, Vec<u8>), String> {
+    let mut resp = agent().get(url).call().map_err(describe)?;
+    let status = resp.status().as_u16();
+    let body = resp.body_mut().with_config().limit(limit).read_to_vec().map_err(describe)?;
+    Ok((status, body))
+}
+
 fn describe(e: ureq::Error) -> String {
     match e {
         ureq::Error::Timeout(_) => "The request timed out".into(),

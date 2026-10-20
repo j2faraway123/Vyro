@@ -1,4 +1,5 @@
 import {
+  CirclePlay,
   Compass,
   FolderPlus,
   Globe,
@@ -56,7 +57,7 @@ export function Sidebar() {
   const route = useUi((s) => s.route);
   const openNewPlaylist = useUi((s) => s.openNewPlaylist);
   const context = usePlayer((s) => s.context);
-  const playing = usePlayer((s) => s.playing);
+  const playing = usePlayer((s) => s.playing && s.source === "local");
   const shieldOn = useShield((s) => s.state?.config.enabled ?? false);
   const collapsed = mode === "collapsed";
   const icon = 19;
@@ -86,6 +87,7 @@ export function Sidebar() {
         <NavItem icon={<Heart size={icon} />} label="Favorites" route={{ name: "favorites" }} collapsed={collapsed} />
         <NavItem icon={<ListMusic size={icon} />} label="Playlists" route={{ name: "playlists" }} collapsed={collapsed} />
         <NavItem icon={<History size={icon} />} label="Recently Played" route={{ name: "recent" }} collapsed={collapsed} />
+        <NavItem icon={<CirclePlay size={icon} />} label="YouTube Music" route={{ name: "ytm" }} collapsed={collapsed} />
         <NavItem
           icon={<Globe size={icon} />}
           label="Web"

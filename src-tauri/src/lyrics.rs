@@ -125,6 +125,20 @@ fn fetch_lrclib(t: &Track) -> Result<Option<Lyrics>, String> {
     }))
 }
 
+/// Online lookup for a track that isn't in the library (YouTube Music).
+/// Not cached in the database; the UI keeps results for the session.
+pub fn lookup(title: &str, artist: &str, album: &str, duration: f64) -> Result<Lyrics, String> {
+    let track = Track {
+        title: title.to_string(),
+        artist: artist.to_string(),
+        album: album.to_string(),
+        duration,
+        ..Default::default()
+    };
+    let none = Lyrics { synced: None, plain: None, instrumental: false, source: "none".into() };
+    Ok(fetch_lrclib(&track)?.unwrap_or(none))
+}
+
 /// Resolves lyrics for a track. `conn` is locked only briefly around cache
 /// reads/writes so a slow network call never blocks the database.
 pub fn resolve(

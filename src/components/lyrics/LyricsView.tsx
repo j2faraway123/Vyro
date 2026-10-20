@@ -1,10 +1,9 @@
 import { MicVocal, RefreshCw } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import { engine } from "../../audio/engine";
 import { useLyrics } from "../../hooks/useLyrics";
 import { activeLineIndex } from "../../lib/lrc";
 import type { Track } from "../../lib/types";
-import { usePlayer } from "../../store/player";
+import { playerTime, usePlayer } from "../../store/player";
 import { useSettings } from "../../store/settings";
 import { useUi } from "../../store/ui";
 import { Button } from "../common/controls";
@@ -34,7 +33,7 @@ export function LyricsView({ track, variant = "panel" }: { track: Track | null; 
     let raf = 0;
     let last = -2;
     const tick = () => {
-      const i = activeLineIndex(lines, engine.time + offset + 0.15);
+      const i = activeLineIndex(lines, playerTime() + offset + 0.15);
       if (i !== last) {
         last = i;
         setActive(i);
@@ -49,7 +48,7 @@ export function LyricsView({ track, variant = "panel" }: { track: Track | null; 
     setFollow(true);
     setActive(-1);
     box.current?.scrollTo({ top: 0 });
-  }, [track?.id]);
+  }, [track?.id, track?.title]);
 
   useEffect(() => {
     if (!follow || !box.current || active < 0) return;

@@ -99,7 +99,7 @@ export function useShortcuts() {
           break;
         case !ctrl && e.key === "F": {
           const cur = p.current();
-          if (cur) useLibrary.getState().toggleFavorite(cur.id);
+          if (cur && cur.id >= 0) useLibrary.getState().toggleFavorite(cur.id);
           break;
         }
         case !ctrl && e.key === "f":

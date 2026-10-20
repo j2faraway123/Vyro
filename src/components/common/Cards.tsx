@@ -31,7 +31,8 @@ export function AlbumCard({ album, subtitle }: { album: Album; subtitle?: ReactN
   const playTracks = usePlayer((s) => s.playTracks);
   const toggle = usePlayer((s) => s.toggle);
   const context = usePlayer((s) => s.context);
-  const isPlaying = usePlayer((s) => s.playing);
+  const isPlaying = usePlayer((s) => s.playing && s.source === "local");
+  const playLocal = usePlayer((s) => s.playLocal);
   const active = context === `album:${album.key}`;
   return (
     <div
@@ -47,7 +48,7 @@ export function AlbumCard({ album, subtitle }: { album: Album; subtitle?: ReactN
         <PlayFab
           label={active && isPlaying ? `Pause ${album.title}` : `Play ${album.title}`}
           playing={active && isPlaying}
-          onClick={() => (active ? toggle() : playTracks(sortAlbumTracks(album.trackIds, byId), 0, `album:${album.key}`))}
+          onClick={() => (active ? (isPlaying ? toggle() : playLocal()) : playTracks(sortAlbumTracks(album.trackIds, byId), 0, `album:${album.key}`))}
         />
       </div>
       <div className="truncate font-bold text-fg">{album.title}</div>

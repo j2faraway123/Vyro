@@ -21,10 +21,11 @@ function usePlayContext(context: string, ids: number[]) {
   const playTracks = usePlayer((s) => s.playTracks);
   const toggle = usePlayer((s) => s.toggle);
   const active = usePlayer((s) => s.context === context);
-  const playing = usePlayer((s) => s.playing);
+  const playing = usePlayer((s) => s.playing && s.source === "local");
+  const playLocal = usePlayer((s) => s.playLocal);
   return {
     playing: active && playing,
-    onPlay: () => (active ? toggle() : playTracks(ids, 0, context)),
+    onPlay: () => (active ? (playing ? toggle() : playLocal()) : playTracks(ids, 0, context)),
     onShuffle: () => playTracks(shuffled(ids), 0, context),
   };
 }
